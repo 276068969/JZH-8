@@ -6,7 +6,7 @@
         <h1>玩具售卖全链路监管</h1>
         <p>面向消费者查询、商家合规上架、监管审核与投诉处置的一体化平台。</p>
       </div>
-      <el-button type="primary" size="large" @click="$router.push('/login')">进入后台</el-button>
+      <el-button type="primary" size="large" @click="goToBackend">{{ auth.token ? '进入后台' : '登录' }}</el-button>
     </section>
 
     <section class="filter-panel">
@@ -119,6 +119,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, RefreshLeft } from '@element-plus/icons-vue'
 import { http } from '../api/http'
+import { useAuthStore } from '../stores/auth'
+import { useRouter } from 'vue-router'
+
+const auth = useAuthStore()
+const router = useRouter()
 
 interface Product {
   id: number
@@ -230,6 +235,20 @@ async function submitComplaint() {
   await http.post('/public/complaints', complaint)
   ElMessage.success('投诉已提交，等待监管处理')
   dialogVisible.value = false
+}
+
+function goToBackend() {
+  if (!auth.token) {
+    router.push('/login')
+    return
+  }
+  if (auth.role === 'MERCHANT') {
+    router.push('/merchant')
+  } else if (auth.role === 'ADMIN' || auth.role === 'REGULATOR') {
+    router.push('/admin')
+  } else {
+    router.push('/login')
+  }
 }
 
 onMounted(async () => {

@@ -18,6 +18,7 @@ public class InMemoryStore {
     private final Map<Long, Complaint> complaints = new LinkedHashMap<>();
     private final Map<Long, Notice> notices = new LinkedHashMap<>();
     private final AtomicLong complaintSeq = new AtomicLong(1000);
+    private final AtomicLong productSeq = new AtomicLong(200);
 
     public InMemoryStore() {
         users.put("admin", new AppUser(1L, "admin", "123456", "系统管理员", Role.ADMIN));
@@ -25,9 +26,9 @@ public class InMemoryStore {
         users.put("merchant", new AppUser(3L, "merchant", "123456", "星河玩具商家", Role.MERCHANT));
         users.put("user", new AppUser(4L, "user", "123456", "普通用户", Role.USER));
 
-        merchants.put(1L, new Merchant(1L, "星河玩具旗舰店", "LIC-TOY-2026-001", "merchant@example.com", AuditStatus.APPROVED, false, "资质齐全"));
-        merchants.put(2L, new Merchant(2L, "童趣优选", "LIC-TOY-2026-019", "kids@example.com", AuditStatus.PENDING, false, "待核验检测报告"));
-        merchants.put(3L, new Merchant(3L, "彩盒玩具铺", "LIC-TOY-2025-044", "box@example.com", AuditStatus.RECTIFYING, false, "包装警示语需整改"));
+        merchants.put(1L, new Merchant(1L, "星河玩具旗舰店", "LIC-TOY-2026-001", "merchant@example.com", AuditStatus.APPROVED, false, "资质齐全", "merchant"));
+        merchants.put(2L, new Merchant(2L, "童趣优选", "LIC-TOY-2026-019", "kids@example.com", AuditStatus.PENDING, false, "待核验检测报告", null));
+        merchants.put(3L, new Merchant(3L, "彩盒玩具铺", "LIC-TOY-2025-044", "box@example.com", AuditStatus.RECTIFYING, false, "包装警示语需整改", null));
 
         products.put(101L, new ToyProduct(101L, "磁力积木 120 件套", "益智玩具", 1L, "星河玩具旗舰店", new BigDecimal("129.00"), 360,
                 "CCC-2026-MAG-0088", "磁通量检测报告.pdf", "https://images.unsplash.com/photo-1560961911-ba7ef651a56c?auto=format&fit=crop&w=900&q=80", AuditStatus.APPROVED, "通过"));
@@ -37,6 +38,10 @@ public class InMemoryStore {
                 "CCC-2026-PLUSH-0210", "甲醛与阻燃检测.pdf", "https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=900&q=80", AuditStatus.APPROVED, "通过"));
         products.put(104L, new ToyProduct(104L, "彩泥创作套装", "手工玩具", 3L, "彩盒玩具铺", new BigDecimal("39.90"), 126,
                 "CCC-2025-CLAY-0311", "塑化剂复检报告.pdf", "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80", AuditStatus.RECTIFYING, "缺少年龄分级标识"));
+        products.put(105L, new ToyProduct(105L, "木质拼图 500片", "益智玩具", 1L, "星河玩具旗舰店", new BigDecimal("89.00"), 0,
+                "", "", "https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=900&q=80", AuditStatus.DRAFT, "草稿商品，待完善资料"));
+        products.put(106L, new ToyProduct(106L, "遥控赛车", "运动玩具", 1L, "星河玩具旗舰店", new BigDecimal("199.00"), 50,
+                "CCC-2026-RC-0042", "电磁辐射检测报告.pdf", "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=900&q=80", AuditStatus.DRAFT, "待提交审核"));
 
         complaints.put(900L, seededComplaint(900L, 104L, "彩泥创作套装", "user", "包装未标注适用年龄，存在误购风险。", ComplaintStatus.PROCESSING));
         complaints.put(901L, seededComplaint(901L, 102L, "儿童软弹发射器", "user", "疑似宣传射程与检测信息不一致。", ComplaintStatus.PENDING));
@@ -73,5 +78,49 @@ public class InMemoryStore {
         complaint.getRecords().add("用户提交投诉");
         complaints.put(id, complaint);
         return complaint;
+    }
+
+    public List<ToyProduct> productsByMerchant(Long merchantId) {
+        return products.values().stream()
+                .filter(p -> merchantId == null || p.getMerchantId().equals(merchantId))
+                .sorted(Comparator.comparing(ToyProduct::getId).reversed())
+                .toList();
+    }
+
+    public ToyProduct createProduct(ToyProduct product) {
+        Long id = productSeq.incrementAndGet();
+        product.setId(id);
+        if (product.getStatus() == null) {
+            product.setStatus(AuditStatus.DRAFT);
+        }
+        products.put(id, product);
+        return product;
+    }
+
+    public ToyProduct updateProduct(Long id, ToyProduct product) {
+        ToyProduct existing = products.get(id);
+        if (existing == null) {
+            return null;
+        }
+        if (product.getName() != null) existing.setName(product.getName());
+        if (product.getCategory() != null) existing.setCategory(product.getCategory());
+        if (product.getPrice() != null) existing.setPrice(product.getPrice());
+        if (product.getStock() >= 0) existing.setStock(product.getStock());
+        if (product.getCertificationNo() != null) existing.setCertificationNo(product.getCertificationNo());
+        if (product.getReportName() != null) existing.setReportName(product.getReportName());
+        if (product.getImageUrl() != null) existing.setImageUrl(product.getImageUrl());
+        if (product.getStatus() != null) existing.setStatus(product.getStatus());
+        if (product.getAuditRemark() != null) existing.setAuditRemark(product.getAuditRemark());
+        return existing;
+    }
+
+    public boolean deleteProduct(Long id) {
+        return products.remove(id) != null;
+    }
+
+    public Optional<Merchant> findMerchantByUsername(String username) {
+        return merchants.values().stream()
+                .filter(m -> username != null && username.equals(m.getUsername()))
+                .findFirst();
     }
 }

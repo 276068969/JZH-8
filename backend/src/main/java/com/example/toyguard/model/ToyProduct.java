@@ -44,6 +44,16 @@ public class ToyProduct {
     public String getImageUrl() { return imageUrl; }
     public AuditStatus getStatus() { return status; }
     public String getAuditRemark() { return auditRemark; }
+    public void setId(Long id) { this.id = id; }
+    public void setName(String name) { this.name = name; }
+    public void setCategory(String category) { this.category = category; }
+    public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
+    public void setMerchantName(String merchantName) { this.merchantName = merchantName; }
+    public void setPrice(BigDecimal price) { this.price = price; }
+    public void setStock(int stock) { this.stock = stock; }
+    public void setCertificationNo(String certificationNo) { this.certificationNo = certificationNo; }
+    public void setReportName(String reportName) { this.reportName = reportName; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public void setStatus(AuditStatus status) { this.status = status; }
     public void setAuditRemark(String auditRemark) { this.auditRemark = auditRemark; }
 }

@@ -149,11 +149,11 @@ async function processComplaint(id: number, status: string, record: string) {
 }
 
 function statusText(status: string) {
-  return { PENDING: '待审核', APPROVED: '已通过', REJECTED: '已驳回', RECTIFYING: '整改中', OFF_SHELF: '已下架' }[status] || status
+  return { DRAFT: '草稿', PENDING: '待审核', APPROVED: '已通过', REJECTED: '已驳回', RECTIFYING: '整改中', OFF_SHELF: '已下架' }[status] || status
 }
 
 function statusType(status: string) {
-  return { PENDING: 'info', APPROVED: 'success', REJECTED: 'danger', RECTIFYING: 'warning', OFF_SHELF: 'danger' }[status] || 'info'
+  return { DRAFT: 'info', PENDING: 'info', APPROVED: 'success', REJECTED: 'danger', RECTIFYING: 'warning', OFF_SHELF: 'danger' }[status] || 'info'
 }
 
 function complaintText(status: string) {

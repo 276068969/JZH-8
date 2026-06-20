@@ -36,7 +36,13 @@ async function submit() {
   try {
     await auth.login(form.username, form.password)
     ElMessage.success('登录成功')
-    router.push('/admin')
+    if (auth.role === 'MERCHANT') {
+      router.push('/merchant')
+    } else if (auth.role === 'ADMIN' || auth.role === 'REGULATOR') {
+      router.push('/admin')
+    } else {
+      router.push('/')
+    }
   } catch {
     ElMessage.error('账号或密码错误')
   } finally {
