@@ -8,10 +8,55 @@
       <el-tag size="large">{{ auth.role || '未登录' }}</el-tag>
     </section>
 
-    <section class="metric-grid">
-      <div v-for="item in metrics" :key="item.label" class="metric">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
+    <section class="dashboard-section">
+      <h2 class="section-title">概览总览</h2>
+      <div class="metric-grid">
+        <div v-for="item in metrics" :key="item.label" class="metric">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2 class="section-title">商家审核状态分布</h2>
+      <div class="metric-grid">
+        <div v-for="item in merchantStatusMetrics" :key="item.label" class="metric status-metric" :class="item.type">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2 class="section-title">商品审核统计</h2>
+      <div class="metric-grid">
+        <div class="metric primary">
+          <span>审核通过率</span>
+          <strong>{{ dashboard.productApprovalRate ?? 0 }}%</strong>
+        </div>
+        <div class="metric">
+          <span>已通过商品</span>
+          <strong>{{ dashboard.approvedProducts ?? 0 }}</strong>
+        </div>
+        <div class="metric">
+          <span>已审核总数</span>
+          <strong>{{ dashboard.totalReviewedProducts ?? 0 }}</strong>
+        </div>
+        <div class="metric warning">
+          <span>整改中商品</span>
+          <strong>{{ dashboard.rectifyingProducts ?? 0 }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2 class="section-title">投诉状态分布</h2>
+      <div class="metric-grid">
+        <div v-for="item in complaintStatusMetrics" :key="item.label" class="metric status-metric" :class="item.type">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
       </div>
     </section>
 
@@ -153,7 +198,7 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const active = ref('products')
-const dashboard = ref<Record<string, number>>({})
+const dashboard = ref<any>({})
 const products = ref<any[]>([])
 const merchants = ref<any[]>([])
 const complaints = ref<any[]>([])
@@ -165,11 +210,43 @@ const searchToStatus = ref('')
 
 const metrics = computed(() => [
   { label: '商品总数', value: dashboard.value.products ?? 0 },
-  { label: '待审商品', value: dashboard.value.pendingProducts ?? 0 },
-  { label: '投诉数量', value: dashboard.value.complaints ?? 0 },
+  { label: '待处理事项', value: dashboard.value.pendingTotal ?? 0, type: 'pending' },
+  { label: '投诉总数', value: dashboard.value.complaints ?? 0 },
   { label: '黑名单商家', value: dashboard.value.blacklistedMerchants ?? 0 },
   { label: '平台账号', value: dashboard.value.users ?? 0 }
 ])
+
+const merchantStatusMetrics = computed(() => {
+  const dist = (dashboard.value.merchantStatusDistribution as Record<string, number>) || {}
+  const statusMap: Record<string, { label: string; type: string }> = {
+    DRAFT: { label: '草稿', type: 'info' },
+    PENDING: { label: '待审核', type: 'pending' },
+    APPROVED: { label: '已通过', type: 'success' },
+    REJECTED: { label: '已驳回', type: 'danger' },
+    RECTIFYING: { label: '整改中', type: 'warning' },
+    OFF_SHELF: { label: '已下架', type: 'danger' }
+  }
+  return Object.entries(statusMap).map(([key, info]) => ({
+    label: info.label,
+    value: dist[key] ?? 0,
+    type: info.type
+  }))
+})
+
+const complaintStatusMetrics = computed(() => {
+  const dist = (dashboard.value.complaintStatusDistribution as Record<string, number>) || {}
+  const statusMap: Record<string, { label: string; type: string }> = {
+    PENDING: { label: '待处理', type: 'pending' },
+    PROCESSING: { label: '处理中', type: 'warning' },
+    RESOLVED: { label: '已办结', type: 'success' },
+    REJECTED: { label: '已驳回', type: 'danger' }
+  }
+  return Object.entries(statusMap).map(([key, info]) => ({
+    label: info.label,
+    value: dist[key] ?? 0,
+    type: info.type
+  }))
+})
 
 async function loadAll() {
   const [dash, productRes, merchantRes, complaintRes, userRes, auditRes] = await Promise.all([
@@ -265,5 +342,109 @@ onMounted(loadAll)
   margin-bottom: 16px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.dashboard-section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0 0 12px 0;
+  padding-left: 8px;
+  border-left: 3px solid #409eff;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.metric:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.metric span {
+  font-size: 13px;
+  color: #909399;
+}
+
+.metric strong {
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.metric.primary strong {
+  color: #409eff;
+}
+
+.metric.success strong {
+  color: #67c23a;
+}
+
+.metric.warning strong {
+  color: #e6a23c;
+}
+
+.metric.danger strong {
+  color: #f56c6c;
+}
+
+.metric.pending strong {
+  color: #909399;
+}
+
+.metric.info strong {
+  color: #909399;
+}
+
+.status-metric {
+  position: relative;
+}
+
+.status-metric::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 8px 0 0 8px;
+}
+
+.status-metric.success::before {
+  background: #67c23a;
+}
+
+.status-metric.warning::before {
+  background: #e6a23c;
+}
+
+.status-metric.danger::before {
+  background: #f56c6c;
+}
+
+.status-metric.pending::before {
+  background: #909399;
+}
+
+.status-metric.info::before {
+  background: #909399;
 }
 </style>

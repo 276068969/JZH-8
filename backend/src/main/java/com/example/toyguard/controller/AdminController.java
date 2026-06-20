@@ -32,6 +32,50 @@ public class AdminController {
         result.put("complaints", store.complaints().size());
         result.put("blacklistedMerchants", store.merchants().stream().filter(Merchant::isBlacklisted).count());
         result.put("users", store.users().size());
+
+        Map<String, Long> merchantStatusDistribution = new LinkedHashMap<>();
+        for (AuditStatus status : AuditStatus.values()) {
+            long count = store.merchants().stream().filter(m -> m.getStatus() == status).count();
+            merchantStatusDistribution.put(status.name(), count);
+        }
+        result.put("merchantStatusDistribution", merchantStatusDistribution);
+
+        long totalReviewedProducts = store.products().stream()
+                .filter(p -> p.getStatus() != AuditStatus.DRAFT && p.getStatus() != AuditStatus.PENDING)
+                .count();
+        long approvedProducts = store.products().stream()
+                .filter(p -> p.getStatus() == AuditStatus.APPROVED)
+                .count();
+        double productApprovalRate = totalReviewedProducts > 0 ? (double) approvedProducts / totalReviewedProducts : 0.0;
+        result.put("productApprovalRate", Math.round(productApprovalRate * 10000) / 100.0);
+        result.put("approvedProducts", approvedProducts);
+        result.put("totalReviewedProducts", totalReviewedProducts);
+
+        Map<String, Long> complaintStatusDistribution = new LinkedHashMap<>();
+        for (ComplaintStatus status : ComplaintStatus.values()) {
+            long count = store.complaints().stream().filter(c -> c.getStatus() == status).count();
+            complaintStatusDistribution.put(status.name(), count);
+        }
+        result.put("complaintStatusDistribution", complaintStatusDistribution);
+
+        long pendingMerchants = store.merchants().stream()
+                .filter(m -> m.getStatus() == AuditStatus.PENDING)
+                .count();
+        long pendingComplaints = store.complaints().stream()
+                .filter(c -> c.getStatus() == ComplaintStatus.PENDING)
+                .count();
+        long rectifyingProducts = store.products().stream()
+                .filter(p -> p.getStatus() == AuditStatus.RECTIFYING)
+                .count();
+        long pendingTotal = store.products().stream().filter(p -> p.getStatus() == AuditStatus.PENDING).count()
+                + pendingMerchants
+                + pendingComplaints
+                + rectifyingProducts;
+        result.put("pendingMerchants", pendingMerchants);
+        result.put("pendingComplaints", pendingComplaints);
+        result.put("rectifyingProducts", rectifyingProducts);
+        result.put("pendingTotal", pendingTotal);
+
         return result;
     }
 
