@@ -321,7 +321,34 @@ async function saveProduct() {
   }
 }
 
+function validateSubmission(row: Product): string[] {
+  const errors: string[] = []
+  if (!row.name?.trim()) errors.push('商品名称不能为空')
+  if (!row.category?.trim()) errors.push('商品分类不能为空')
+  if (!row.price || Number(row.price) <= 0) errors.push('商品价格必须大于0')
+  if (row.stock == null || row.stock < 0) errors.push('库存数量不能为负数')
+  if (!row.certificationNo?.trim()) errors.push('认证编号不能为空，请填写3C等认证编号')
+  if (!row.reportName?.trim()) errors.push('检测报告不能为空，请上传或填写检测报告名称')
+  if (!row.imageUrl?.trim()) errors.push('商品图片不能为空，请上传商品图片')
+  return errors
+}
+
 async function submitForAudit(row: Product) {
+  const preCheckErrors = validateSubmission(row)
+  if (preCheckErrors.length > 0) {
+    try {
+      await ElMessageBox.alert(
+        `送审资料不完整，缺少以下内容：\n\n${preCheckErrors.map((e, i) => `${i + 1}. ${e}`).join('\n')}\n\n请先完善资料后再提交审核。`,
+        '资料校验未通过',
+        { type: 'warning', confirmButtonText: '去完善' }
+      )
+      openEditDialog(row)
+    } catch {
+      // user closed
+    }
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定要将「${row.name}」提交审核吗？提交后将无法修改，等待监管审核。`,
@@ -331,8 +358,11 @@ async function submitForAudit(row: Product) {
     await http.post(`/merchant/products/${row.id}/submit`)
     ElMessage.success('已提交审核，请等待监管处理')
     await loadAll()
-  } catch (e) {
-    // user cancelled
+  } catch (e: any) {
+    if (e !== 'cancel' && e !== undefined) {
+      const msg = e?.response?.data?.message || e?.message || '提交失败'
+      ElMessage.error(msg)
+    }
   }
 }
 
@@ -346,8 +376,11 @@ async function handleOffShelf(row: Product) {
     await http.post(`/merchant/products/${row.id}/off-shelf`)
     ElMessage.success('商品已下架')
     await loadAll()
-  } catch (e) {
-    // user cancelled
+  } catch (e: any) {
+    if (e !== 'cancel' && e !== undefined) {
+      const msg = e?.response?.data?.message || e?.message || '操作失败'
+      ElMessage.error(msg)
+    }
   }
 }
 
@@ -361,8 +394,11 @@ async function handleReEdit(row: Product) {
     await http.post(`/merchant/products/${row.id}/re-edit`)
     ElMessage.success('已转为草稿，可重新编辑后提交审核')
     await loadAll()
-  } catch (e) {
-    // user cancelled
+  } catch (e: any) {
+    if (e !== 'cancel' && e !== undefined) {
+      const msg = e?.response?.data?.message || e?.message || '操作失败'
+      ElMessage.error(msg)
+    }
   }
 }
 
@@ -376,8 +412,11 @@ async function handleDelete(row: Product) {
     await http.delete(`/merchant/products/${row.id}`)
     ElMessage.success('商品已删除')
     await loadAll()
-  } catch (e) {
-    // user cancelled
+  } catch (e: any) {
+    if (e !== 'cancel' && e !== undefined) {
+      const msg = e?.response?.data?.message || e?.message || '删除失败'
+      ElMessage.error(msg)
+    }
   }
 }
 
