@@ -55,11 +55,11 @@
     </section>
 
     <section v-if="products.length > 0" class="product-grid">
-      <article v-for="item in products" :key="item.id" class="product-card">
-        <img :src="item.imageUrl" :alt="item.name">
+      <article v-for="item in products" :key="item.id" class="product-card" @click="goToDetail(item)">
+        <img :src="item.imageUrl" :alt="item.name" class="card-image">
         <div class="product-body">
           <div class="row-between">
-            <h2>{{ item.name }}</h2>
+            <h2 class="card-title">{{ item.name }}</h2>
             <div class="tags">
               <el-tag :type="item.stock > 0 ? 'success' : 'info'" size="small" effect="plain">
                 {{ item.stock > 0 ? '有货' : '缺货' }}
@@ -72,7 +72,10 @@
           <p class="stock">库存：{{ item.stock }} 件</p>
           <div class="row-between">
             <strong>￥{{ item.price }}</strong>
-            <el-button size="small" @click="openComplaint(item)">投诉</el-button>
+            <div class="card-actions">
+              <el-button size="small" :icon="View" @click.stop="goToDetail(item)">查看详情</el-button>
+              <el-button size="small" @click.stop="openComplaint(item)">投诉</el-button>
+            </div>
           </div>
         </div>
       </article>
@@ -117,7 +120,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, RefreshLeft } from '@element-plus/icons-vue'
+import { Search, RefreshLeft, View } from '@element-plus/icons-vue'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
@@ -222,6 +225,10 @@ function resetFilters() {
   stockStatus.value = ''
   certificationNo.value = ''
   loadProducts()
+}
+
+function goToDetail(item: Product) {
+  router.push(`/product/${item.id}`)
 }
 
 function openComplaint(item: Product) {
@@ -350,6 +357,24 @@ onMounted(async () => {
   margin-bottom: 20px;
 }
 
+.product-card {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.product-card .card-image {
+  transition: transform 0.3s ease;
+}
+
+.product-card:hover .card-image {
+  transform: scale(1.03);
+}
+
 .product-card .tags {
   display: flex;
   gap: 6px;
@@ -359,5 +384,14 @@ onMounted(async () => {
   color: #909399;
   font-size: 12px;
   margin: 4px 0;
+}
+
+.card-title {
+  cursor: pointer;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

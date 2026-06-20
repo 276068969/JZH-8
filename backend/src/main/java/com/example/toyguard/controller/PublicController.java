@@ -59,6 +59,11 @@ public class PublicController {
         return store.notices();
     }
 
+    @GetMapping("/products/{id}")
+    public ToyProduct productDetail(@PathVariable Long id) {
+        return store.product(id).orElse(null);
+    }
+
     @PostMapping("/complaints")
     public Complaint createComplaint(@Valid @RequestBody ComplaintRequest request) {
         return store.createComplaint(request);

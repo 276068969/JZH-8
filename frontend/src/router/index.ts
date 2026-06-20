@@ -4,11 +4,13 @@ import PortalView from '../views/PortalView.vue'
 import LoginView from '../views/LoginView.vue'
 import AdminView from '../views/AdminView.vue'
 import MerchantWorkbench from '../views/MerchantWorkbench.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: PortalView },
+    { path: '/product/:id', component: ProductDetailView },
     { path: '/login', component: LoginView },
     { path: '/admin', component: AdminView, meta: { requiresAuth: true, roles: ['ADMIN', 'REGULATOR'] } },
     { path: '/merchant', component: MerchantWorkbench, meta: { requiresAuth: true, roles: ['MERCHANT'] } }
