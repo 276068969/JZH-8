@@ -83,6 +83,64 @@
           <el-table-column prop="role" label="角色" />
         </el-table>
       </el-tab-pane>
+
+      <el-tab-pane label="审核记录" name="audit-records">
+        <div class="filter-bar">
+          <el-input
+            v-model="searchProductName"
+            placeholder="输入商品名称搜索"
+            clearable
+            style="width: 220px"
+            @clear="loadAuditRecords"
+            @keyup.enter="searchAuditRecords"
+          />
+          <el-select
+            v-model="searchMerchantId"
+            placeholder="选择商家"
+            clearable
+            style="width: 200px"
+            @change="searchAuditRecords"
+            @clear="loadAuditRecords"
+          >
+            <el-option
+              v-for="m in merchants"
+              :key="m.id"
+              :label="m.name"
+              :value="m.id"
+            />
+          </el-select>
+          <el-select
+            v-model="searchToStatus"
+            placeholder="审核结果"
+            clearable
+            style="width: 160px"
+            @change="searchAuditRecords"
+            @clear="loadAuditRecords"
+          >
+            <el-option label="通过" value="APPROVED" />
+            <el-option label="整改" value="RECTIFYING" />
+            <el-option label="驳回" value="REJECTED" />
+            <el-option label="下架" value="OFF_SHELF" />
+            <el-option label="待审核" value="PENDING" />
+          </el-select>
+          <el-button type="primary" @click="searchAuditRecords">查询</el-button>
+          <el-button @click="resetAuditSearch">重置</el-button>
+        </div>
+        <el-table :data="auditRecords" border>
+          <el-table-column prop="id" label="记录ID" width="90" />
+          <el-table-column prop="productName" label="商品" min-width="170" />
+          <el-table-column prop="merchantName" label="商家" min-width="150" />
+          <el-table-column label="原状态" width="110">
+            <template #default="{ row }"><el-tag :type="statusType(row.fromStatus)" size="small">{{ statusText(row.fromStatus) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column label="目标状态" width="110">
+            <template #default="{ row }"><el-tag :type="statusType(row.toStatus)" size="small">{{ statusText(row.toStatus) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column prop="remark" label="审核意见" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="operator" label="操作人" width="120" />
+          <el-table-column prop="operateTime" label="操作时间" width="180" />
+        </el-table>
+      </el-tab-pane>
     </el-tabs>
   </main>
 </template>
@@ -100,6 +158,10 @@ const products = ref<any[]>([])
 const merchants = ref<any[]>([])
 const complaints = ref<any[]>([])
 const users = ref<any[]>([])
+const auditRecords = ref<any[]>([])
+const searchProductName = ref('')
+const searchMerchantId = ref<number | null>(null)
+const searchToStatus = ref('')
 
 const metrics = computed(() => [
   { label: '商品总数', value: dashboard.value.products ?? 0 },
@@ -110,18 +172,47 @@ const metrics = computed(() => [
 ])
 
 async function loadAll() {
-  const [dash, productRes, merchantRes, complaintRes, userRes] = await Promise.all([
+  const [dash, productRes, merchantRes, complaintRes, userRes, auditRes] = await Promise.all([
     http.get('/admin/dashboard'),
     http.get('/admin/products'),
     http.get('/admin/merchants'),
     http.get('/admin/complaints'),
-    http.get('/admin/users')
+    http.get('/admin/users'),
+    http.get('/admin/audit-records')
   ])
   dashboard.value = dash.data
   products.value = productRes.data
   merchants.value = merchantRes.data
   complaints.value = complaintRes.data
   users.value = userRes.data
+  auditRecords.value = auditRes.data
+}
+
+async function loadAuditRecords() {
+  const res = await http.get('/admin/audit-records')
+  auditRecords.value = res.data
+}
+
+async function searchAuditRecords() {
+  const params: Record<string, any> = {}
+  if (searchMerchantId.value) params.merchantId = searchMerchantId.value
+  if (searchToStatus.value) params.toStatus = searchToStatus.value
+  if (searchProductName.value) {
+    const all = await http.get('/admin/audit-records', { params })
+    auditRecords.value = all.data.filter((r: any) =>
+      r.productName.includes(searchProductName.value)
+    )
+  } else {
+    const res = await http.get('/admin/audit-records', { params })
+    auditRecords.value = res.data
+  }
+}
+
+function resetAuditSearch() {
+  searchProductName.value = ''
+  searchMerchantId.value = null
+  searchToStatus.value = ''
+  loadAuditRecords()
 }
 
 async function auditProduct(id: number, status: string, remark: string) {
@@ -166,3 +257,13 @@ function complaintType(status: string) {
 
 onMounted(loadAll)
 </script>
+
+<style scoped>
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+</style>

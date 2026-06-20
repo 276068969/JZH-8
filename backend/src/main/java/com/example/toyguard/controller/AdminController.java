@@ -1,14 +1,17 @@
 package com.example.toyguard.controller;
 
+import com.example.toyguard.config.AuthInterceptor;
 import com.example.toyguard.dto.ComplaintProcessRequest;
 import com.example.toyguard.dto.StatusRequest;
 import com.example.toyguard.model.*;
 import com.example.toyguard.repository.InMemoryStore;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -38,10 +41,27 @@ public class AdminController {
     }
 
     @PatchMapping("/products/{id}/audit")
-    public ToyProduct auditProduct(@PathVariable Long id, @RequestBody StatusRequest request) {
+    public ToyProduct auditProduct(@PathVariable Long id, @RequestBody StatusRequest request, HttpServletRequest httpRequest) {
         ToyProduct product = store.product(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
+        AuditStatus fromStatus = product.getStatus();
+        AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);
         product.setStatus(request.status());
         product.setAuditRemark(request.remark());
+
+        ProductAuditRecord record = new ProductAuditRecord(
+                null,
+                product.getId(),
+                product.getName(),
+                product.getMerchantId(),
+                product.getMerchantName(),
+                fromStatus,
+                request.status(),
+                request.remark(),
+                currentUser != null ? currentUser.displayName() : "系统",
+                LocalDateTime.now()
+        );
+        store.createProductAuditRecord(record);
+
         return product;
     }
 
@@ -76,6 +96,19 @@ public class AdminController {
         complaint.setStatus(request.status());
         complaint.getRecords().add(request.record());
         return complaint;
+    }
+
+    @GetMapping("/audit-records")
+    public Object auditRecords(
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long merchantId,
+            @RequestParam(required = false) AuditStatus toStatus) {
+        return store.productAuditRecords(productId, merchantId, toStatus);
+    }
+
+    @GetMapping("/products/{id}/audit-records")
+    public Object productAuditRecords(@PathVariable Long id) {
+        return store.productAuditRecordsByProduct(id);
     }
 
     @GetMapping("/users")

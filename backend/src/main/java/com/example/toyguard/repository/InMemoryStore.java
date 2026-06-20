@@ -17,8 +17,10 @@ public class InMemoryStore {
     private final Map<Long, ToyProduct> products = new LinkedHashMap<>();
     private final Map<Long, Complaint> complaints = new LinkedHashMap<>();
     private final Map<Long, Notice> notices = new LinkedHashMap<>();
+    private final Map<Long, ProductAuditRecord> productAuditRecords = new LinkedHashMap<>();
     private final AtomicLong complaintSeq = new AtomicLong(1000);
     private final AtomicLong productSeq = new AtomicLong(200);
+    private final AtomicLong productAuditSeq = new AtomicLong(5000);
 
     public InMemoryStore() {
         users.put("admin", new AppUser(1L, "admin", "123456", "系统管理员", Role.ADMIN));
@@ -48,6 +50,13 @@ public class InMemoryStore {
 
         notices.put(1L, new Notice(1L, "六一儿童节玩具安全专项检查启动", "重点检查磁力玩具、软弹玩具、彩泥类产品的认证与警示标签。", LocalDate.now().minusDays(12)));
         notices.put(2L, new Notice(2L, "平台上线商品检测报告抽验规则", "已上架商品将按类目与投诉热度进行抽样复核。", LocalDate.now().minusDays(5)));
+
+        productAuditRecords.put(5001L, new ProductAuditRecord(5001L, 101L, "磁力积木 120 件套", 1L, "星河玩具旗舰店",
+                AuditStatus.PENDING, AuditStatus.APPROVED, "资质齐全，检测报告有效", "admin", LocalDateTime.now().minusDays(10)));
+        productAuditRecords.put(5002L, new ProductAuditRecord(5002L, 103L, "毛绒安抚熊", 1L, "星河玩具旗舰店",
+                AuditStatus.PENDING, AuditStatus.APPROVED, "通过", "regulator", LocalDateTime.now().minusDays(7)));
+        productAuditRecords.put(5003L, new ProductAuditRecord(5003L, 104L, "彩泥创作套装", 3L, "彩盒玩具铺",
+                AuditStatus.PENDING, AuditStatus.RECTIFYING, "缺少年龄分级标识", "regulator", LocalDateTime.now().minusDays(3)));
     }
 
     private Complaint seededComplaint(Long id, Long productId, String productName, String reporter, String reason, ComplaintStatus status) {
@@ -122,5 +131,28 @@ public class InMemoryStore {
         return merchants.values().stream()
                 .filter(m -> username != null && username.equals(m.getUsername()))
                 .findFirst();
+    }
+
+    public ProductAuditRecord createProductAuditRecord(ProductAuditRecord record) {
+        Long id = productAuditSeq.incrementAndGet();
+        record.setId(id);
+        productAuditRecords.put(id, record);
+        return record;
+    }
+
+    public List<ProductAuditRecord> productAuditRecords(Long productId, Long merchantId, AuditStatus toStatus) {
+        return productAuditRecords.values().stream()
+                .filter(r -> productId == null || r.getProductId().equals(productId))
+                .filter(r -> merchantId == null || r.getMerchantId().equals(merchantId))
+                .filter(r -> toStatus == null || r.getToStatus() == toStatus)
+                .sorted(Comparator.comparing(ProductAuditRecord::getOperateTime).reversed())
+                .toList();
+    }
+
+    public List<ProductAuditRecord> productAuditRecordsByProduct(Long productId) {
+        return productAuditRecords.values().stream()
+                .filter(r -> r.getProductId().equals(productId))
+                .sorted(Comparator.comparing(ProductAuditRecord::getOperateTime).reversed())
+                .toList();
     }
 }
