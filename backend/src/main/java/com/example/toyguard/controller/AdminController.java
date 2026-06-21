@@ -1,6 +1,8 @@
 package com.example.toyguard.controller;
 
 import com.example.toyguard.config.AuthInterceptor;
+import com.example.toyguard.dto.BatchAuditRequest;
+import com.example.toyguard.dto.BatchAuditResult;
 import com.example.toyguard.dto.ComplaintProcessRequest;
 import com.example.toyguard.dto.StatusRequest;
 import com.example.toyguard.model.*;
@@ -15,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/admin")
@@ -110,6 +113,61 @@ public class AdminController {
         return product;
     }
 
+    private static final Set<AuditStatus> PRODUCT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING, AuditStatus.DRAFT);
+
+    @PostMapping("/products/batch-audit")
+    public BatchAuditResult batchAuditProducts(@RequestBody BatchAuditRequest request, HttpServletRequest httpRequest) {
+        BatchAuditResult result = new BatchAuditResult();
+        if (request.ids() == null || request.ids().isEmpty()) {
+            return result;
+        }
+        result.setTotal(request.ids().size());
+        AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);
+        String operatorName = currentUser != null ? currentUser.displayName() : "系统";
+
+        for (Long id : request.ids()) {
+            ToyProduct product = store.product(id).orElse(null);
+            if (product == null) {
+                result.addSkipped(id, "未知商品", "商品不存在");
+                continue;
+            }
+            if (!PRODUCT_AUDITABLE_STATUSES.contains(product.getStatus())) {
+                result.addSkipped(id, product.getName(), "当前状态「" + statusText(product.getStatus()) + "」不允许审核操作");
+                continue;
+            }
+            AuditStatus fromStatus = product.getStatus();
+            product.setStatus(request.status());
+            product.setAuditRemark(request.remark());
+
+            ProductAuditRecord record = new ProductAuditRecord(
+                    null,
+                    product.getId(),
+                    product.getName(),
+                    product.getMerchantId(),
+                    product.getMerchantName(),
+                    fromStatus,
+                    request.status(),
+                    request.remark(),
+                    operatorName,
+                    LocalDateTime.now()
+            );
+            store.createProductAuditRecord(record);
+            result.addSuccess(id);
+        }
+        return result;
+    }
+
+    private String statusText(AuditStatus status) {
+        return switch (status) {
+            case DRAFT -> "草稿";
+            case PENDING -> "待审核";
+            case APPROVED -> "已通过";
+            case REJECTED -> "已驳回";
+            case RECTIFYING -> "整改中";
+            case OFF_SHELF -> "已下架";
+        };
+    }
+
     @GetMapping("/merchants")
     public Object merchants() {
         return store.merchants();
@@ -121,6 +179,33 @@ public class AdminController {
         merchant.setStatus(request.status());
         merchant.setRemark(request.remark());
         return merchant;
+    }
+
+    private static final Set<AuditStatus> MERCHANT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING, AuditStatus.DRAFT);
+
+    @PostMapping("/merchants/batch-audit")
+    public BatchAuditResult batchAuditMerchants(@RequestBody BatchAuditRequest request) {
+        BatchAuditResult result = new BatchAuditResult();
+        if (request.ids() == null || request.ids().isEmpty()) {
+            return result;
+        }
+        result.setTotal(request.ids().size());
+
+        for (Long id : request.ids()) {
+            Merchant merchant = store.merchant(id).orElse(null);
+            if (merchant == null) {
+                result.addSkipped(id, "未知商家", "商家不存在");
+                continue;
+            }
+            if (!MERCHANT_AUDITABLE_STATUSES.contains(merchant.getStatus())) {
+                result.addSkipped(id, merchant.getName(), "当前状态「" + statusText(merchant.getStatus()) + "」不允许审核操作");
+                continue;
+            }
+            merchant.setStatus(request.status());
+            merchant.setRemark(request.remark());
+            result.addSuccess(id);
+        }
+        return result;
     }
 
     @PatchMapping("/merchants/{id}/blacklist")

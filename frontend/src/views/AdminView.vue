@@ -62,7 +62,28 @@
 
     <el-tabs v-model="active">
       <el-tab-pane label="商品审核" name="products">
-        <el-table :data="products" border>
+        <div class="batch-toolbar">
+          <div class="batch-info">
+            已选 <strong>{{ selectedProducts.length }}</strong> 项
+            <span v-if="selectedProducts.length > 0" class="batch-info-sep">·</span>
+            <span v-if="selectedProducts.length > 0">
+              可审核 <el-tag type="success" size="small">{{ auditableProductCount }}</el-tag>
+              不可审核 <el-tag type="info" size="small">{{ selectedProducts.length - auditableProductCount }}</el-tag>
+            </span>
+          </div>
+          <div class="batch-actions">
+            <el-button type="success" :disabled="selectedProducts.length === 0" @click="openProductBatchAudit('APPROVED')">批量通过</el-button>
+            <el-button type="warning" :disabled="selectedProducts.length === 0" @click="openProductBatchAudit('RECTIFYING')">批量整改</el-button>
+            <el-button type="danger" :disabled="selectedProducts.length === 0" @click="openProductBatchAudit('REJECTED')">批量驳回</el-button>
+          </div>
+        </div>
+        <el-table
+          ref="productTableRef"
+          :data="products"
+          border
+          @selection-change="onProductSelectionChange"
+        >
+          <el-table-column type="selection" width="50" align="center" />
           <el-table-column prop="name" label="商品" min-width="170" />
           <el-table-column prop="category" label="分类" width="110" />
           <el-table-column prop="merchantName" label="商家" min-width="150" />
@@ -72,16 +93,37 @@
           </el-table-column>
           <el-table-column label="操作" width="260" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="success" @click="auditProduct(row.id, 'APPROVED', '审核通过')">通过</el-button>
-              <el-button size="small" type="warning" @click="auditProduct(row.id, 'RECTIFYING', '需补充报告或警示标签')">整改</el-button>
-              <el-button size="small" type="danger" @click="auditProduct(row.id, 'OFF_SHELF', '违规下架')">下架</el-button>
+              <el-button size="small" type="success" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'APPROVED', '审核通过')">通过</el-button>
+              <el-button size="small" type="warning" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'RECTIFYING', '需补充报告或警示标签')">整改</el-button>
+              <el-button size="small" type="danger" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'OFF_SHELF', '违规下架')">下架</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
 
       <el-tab-pane label="商家资质" name="merchants">
-        <el-table :data="merchants" border>
+        <div class="batch-toolbar">
+          <div class="batch-info">
+            已选 <strong>{{ selectedMerchants.length }}</strong> 项
+            <span v-if="selectedMerchants.length > 0" class="batch-info-sep">·</span>
+            <span v-if="selectedMerchants.length > 0">
+              可审核 <el-tag type="success" size="small">{{ auditableMerchantCount }}</el-tag>
+              不可审核 <el-tag type="info" size="small">{{ selectedMerchants.length - auditableMerchantCount }}</el-tag>
+            </span>
+          </div>
+          <div class="batch-actions">
+            <el-button type="success" :disabled="selectedMerchants.length === 0" @click="openMerchantBatchAudit('APPROVED')">批量通过</el-button>
+            <el-button type="warning" :disabled="selectedMerchants.length === 0" @click="openMerchantBatchAudit('RECTIFYING')">批量整改</el-button>
+            <el-button type="danger" :disabled="selectedMerchants.length === 0" @click="openMerchantBatchAudit('REJECTED')">批量驳回</el-button>
+          </div>
+        </div>
+        <el-table
+          ref="merchantTableRef"
+          :data="merchants"
+          border
+          @selection-change="onMerchantSelectionChange"
+        >
+          <el-table-column type="selection" width="50" align="center" />
           <el-table-column prop="name" label="商家名称" min-width="170" />
           <el-table-column prop="licenseNo" label="营业/资质编号" min-width="190" />
           <el-table-column prop="contact" label="联系方式" min-width="170" />
@@ -93,8 +135,8 @@
           </el-table-column>
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
-              <el-button size="small" type="success" @click="auditMerchant(row.id, 'APPROVED', '资质通过')">通过</el-button>
-              <el-button size="small" type="warning" @click="auditMerchant(row.id, 'RECTIFYING', '资质材料需补正')">整改</el-button>
+              <el-button size="small" type="success" :disabled="!isMerchantAuditable(row)" @click="auditMerchant(row.id, 'APPROVED', '资质通过')">通过</el-button>
+              <el-button size="small" type="warning" :disabled="!isMerchantAuditable(row)" @click="auditMerchant(row.id, 'RECTIFYING', '资质材料需补正')">整改</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -313,6 +355,75 @@
         <el-button type="primary" @click="submitComplaintProcess">提交处理</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="batchAuditVisible" :title="batchAuditTitle" width="600px" @close="closeBatchAudit">
+      <div v-if="batchAuditForm" class="batch-audit-content">
+        <div class="batch-audit-summary">
+          <div class="summary-item">
+            <span class="summary-label">操作类型</span>
+            <el-tag :type="batchAuditStatusType" size="large">{{ batchAuditStatusText }}</el-tag>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">影响范围</span>
+            <span class="summary-value">{{ batchAuditForm.targetType === 'product' ? '商品' : '商家资质' }}</span>
+          </div>
+        </div>
+
+        <el-divider content-position="left">影响分析</el-divider>
+
+        <div class="impact-analysis">
+          <div class="impact-row">
+            <span class="impact-label">选中记录</span>
+            <span class="impact-value">{{ batchAuditPreview.total }} 条</span>
+          </div>
+          <div class="impact-row success">
+            <span class="impact-label">将执行操作</span>
+            <span class="impact-value">{{ batchAuditPreview.willProcess }} 条</span>
+          </div>
+          <div v-if="batchAuditPreview.skippedItems.length > 0" class="impact-row warning">
+            <span class="impact-label">将跳过</span>
+            <span class="impact-value">{{ batchAuditPreview.skippedItems.length }} 条（不满足当前状态）</span>
+          </div>
+        </div>
+
+        <el-alert
+          v-if="batchAuditPreview.skippedItems.length > 0"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-top: 12px"
+        >
+          <template #title>以下记录将被跳过</template>
+          <ul class="skipped-list">
+            <li v-for="(item, idx) in batchAuditPreview.skippedItems" :key="idx">
+              <strong>{{ item.name }}</strong>
+              <span class="skipped-reason">：{{ item.reason }}</span>
+            </li>
+          </ul>
+        </el-alert>
+
+        <el-form label-position="top" style="margin-top: 16px">
+          <el-form-item label="审核意见" required>
+            <el-input
+              v-model="batchAuditForm.remark"
+              type="textarea"
+              :rows="3"
+              :placeholder="batchAuditRemarkPlaceholder"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="batchAuditVisible = false">取消</el-button>
+        <el-button
+          :type="batchAuditStatusType === 'success' ? 'success' : batchAuditStatusType === 'warning' ? 'warning' : 'danger'"
+          :disabled="batchAuditPreview.willProcess === 0 || !batchAuditForm?.remark"
+          @click="submitBatchAudit"
+        >
+          确认批量{{ batchAuditStatusText }}（{{ batchAuditPreview.willProcess }}条）
+        </el-button>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
@@ -338,6 +449,30 @@ const complaintDetailVisible = ref(false)
 const complaintDetail = ref<any>(null)
 const complaintProcessVisible = ref(false)
 const processForm = ref<any>(null)
+
+const productTableRef = ref()
+const merchantTableRef = ref()
+const selectedProducts = ref<any[]>([])
+const selectedMerchants = ref<any[]>([])
+
+const AUDITABLE_STATUSES = ['PENDING', 'RECTIFYING', 'DRAFT']
+
+const batchAuditVisible = ref(false)
+const batchAuditForm = ref<{
+  targetType: 'product' | 'merchant'
+  status: string
+  remark: string
+} | null>(null)
+
+const batchAuditPreview = ref<{
+  total: number
+  willProcess: number
+  skippedItems: { id: number; name: string; reason: string }[]
+}>({
+  total: 0,
+  willProcess: 0,
+  skippedItems: []
+})
 
 const metrics = computed(() => [
   { label: '商品总数', value: dashboard.value.products ?? 0 },
@@ -377,6 +512,39 @@ const complaintStatusMetrics = computed(() => {
     value: dist[key] ?? 0,
     type: info.type
   }))
+})
+
+const auditableProductCount = computed(() =>
+  selectedProducts.value.filter(p => AUDITABLE_STATUSES.includes(p.status)).length
+)
+
+const auditableMerchantCount = computed(() =>
+  selectedMerchants.value.filter(m => AUDITABLE_STATUSES.includes(m.status)).length
+)
+
+const batchAuditTitle = computed(() => {
+  if (!batchAuditForm.value) return '批量审核'
+  const typeLabel = batchAuditForm.value.targetType === 'product' ? '商品' : '商家资质'
+  return `批量${batchAuditStatusText.value}${typeLabel}`
+})
+
+const batchAuditStatusText = computed(() => {
+  if (!batchAuditForm.value) return ''
+  return { APPROVED: '通过', RECTIFYING: '整改', REJECTED: '驳回' }[batchAuditForm.value.status] || ''
+})
+
+const batchAuditStatusType = computed(() => {
+  if (!batchAuditForm.value) return 'info'
+  return { APPROVED: 'success', RECTIFYING: 'warning', REJECTED: 'danger' }[batchAuditForm.value.status] || 'info'
+})
+
+const batchAuditRemarkPlaceholder = computed(() => {
+  if (!batchAuditForm.value) return '请输入审核意见'
+  return {
+    APPROVED: '请输入通过说明',
+    RECTIFYING: '请输入整改要求说明',
+    REJECTED: '请输入驳回原因'
+  }[batchAuditForm.value.status] || '请输入审核意见'
 })
 
 async function loadAll() {
@@ -432,6 +600,110 @@ async function auditProduct(id: number, status: string, remark: string) {
 async function auditMerchant(id: number, status: string, remark: string) {
   await http.patch(`/admin/merchants/${id}/audit`, { status, remark })
   ElMessage.success('商家资质已更新')
+  await loadAll()
+}
+
+function isProductAuditable(row: any) {
+  return AUDITABLE_STATUSES.includes(row.status)
+}
+
+function isMerchantAuditable(row: any) {
+  return AUDITABLE_STATUSES.includes(row.status)
+}
+
+function onProductSelectionChange(rows: any[]) {
+  selectedProducts.value = rows
+}
+
+function onMerchantSelectionChange(rows: any[]) {
+  selectedMerchants.value = rows
+}
+
+function buildBatchPreview(rows: any[], status: string) {
+  const skipped: { id: number; name: string; reason: string }[] = []
+  let willProcess = 0
+  for (const row of rows) {
+    if (AUDITABLE_STATUSES.includes(row.status)) {
+      willProcess++
+    } else {
+      skipped.push({
+        id: row.id,
+        name: row.name || row.name,
+        reason: `当前状态「${statusText(row.status)}」不允许${{ APPROVED: '通过', RECTIFYING: '整改', REJECTED: '驳回' }[status] || '审核'}操作`
+      })
+    }
+  }
+  return { total: rows.length, willProcess, skippedItems: skipped }
+}
+
+function openProductBatchAudit(status: string) {
+  if (selectedProducts.value.length === 0) return
+  batchAuditForm.value = {
+    targetType: 'product',
+    status,
+    remark: ''
+  }
+  batchAuditPreview.value = buildBatchPreview(selectedProducts.value, status)
+  batchAuditVisible.value = true
+}
+
+function openMerchantBatchAudit(status: string) {
+  if (selectedMerchants.value.length === 0) return
+  batchAuditForm.value = {
+    targetType: 'merchant',
+    status,
+    remark: ''
+  }
+  batchAuditPreview.value = buildBatchPreview(selectedMerchants.value, status)
+  batchAuditVisible.value = true
+}
+
+function closeBatchAudit() {
+  batchAuditForm.value = null
+  batchAuditPreview.value = { total: 0, willProcess: 0, skippedItems: [] }
+}
+
+async function submitBatchAudit() {
+  if (!batchAuditForm.value) return
+  if (!batchAuditForm.value.remark || !batchAuditForm.value.remark.trim()) {
+    ElMessage.warning('请输入审核意见')
+    return
+  }
+  const ids = batchAuditForm.value.targetType === 'product'
+    ? selectedProducts.value.filter(p => AUDITABLE_STATUSES.includes(p.status)).map(p => p.id)
+    : selectedMerchants.value.filter(m => AUDITABLE_STATUSES.includes(m.status)).map(m => m.id)
+
+  if (ids.length === 0) {
+    ElMessage.warning('没有可审核的记录')
+    return
+  }
+
+  const url = batchAuditForm.value.targetType === 'product'
+    ? '/admin/products/batch-audit'
+    : '/admin/merchants/batch-audit'
+
+  const res = await http.post(url, {
+    ids,
+    status: batchAuditForm.value.status,
+    remark: batchAuditForm.value.remark
+  })
+
+  const result = res.data
+  const typeLabel = batchAuditForm.value.targetType === 'product' ? '商品' : '商家资质'
+
+  if (result.successCount > 0) {
+    ElMessage.success(`已成功${batchAuditStatusText.value} ${result.successCount} 条${typeLabel}`)
+  }
+  if (result.skippedCount > 0) {
+    ElMessage.warning(`跳过 ${result.skippedCount} 条${typeLabel}（状态不满足）`)
+  }
+
+  batchAuditVisible.value = false
+  closeBatchAudit()
+  selectedProducts.value = []
+  selectedMerchants.value = []
+  productTableRef.value?.clearSelection()
+  merchantTableRef.value?.clearSelection()
   await loadAll()
 }
 
@@ -759,5 +1031,122 @@ onMounted(loadAll)
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+.batch-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.batch-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.batch-info strong {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.batch-info-sep {
+  color: #c0c4cc;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.batch-audit-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-audit-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.summary-value {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.impact-analysis {
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.impact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.impact-label {
+  color: #606266;
+}
+
+.impact-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+.impact-row.success .impact-value {
+  color: #67c23a;
+}
+
+.impact-row.warning .impact-value {
+  color: #e6a23c;
+}
+
+.skipped-list {
+  margin: 8px 0 0 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.skipped-list li {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.skipped-list strong {
+  color: #303133;
+}
+
+.skipped-reason {
+  color: #909399;
 }
 </style>
