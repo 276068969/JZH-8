@@ -4,6 +4,7 @@ import com.example.toyguard.config.AuthInterceptor;
 import com.example.toyguard.dto.BatchAuditRequest;
 import com.example.toyguard.dto.BatchAuditResult;
 import com.example.toyguard.dto.ComplaintProcessRequest;
+import com.example.toyguard.dto.ProductRiskWarning;
 import com.example.toyguard.dto.StatusRequest;
 import com.example.toyguard.model.*;
 import com.example.toyguard.repository.InMemoryStore;
@@ -79,6 +80,16 @@ public class AdminController {
         result.put("pendingComplaints", pendingComplaints);
         result.put("rectifyingProducts", rectifyingProducts);
         result.put("pendingTotal", pendingTotal);
+
+        List<ProductRiskWarning> riskWarnings = store.productRiskWarnings(null, null, null, null);
+        Map<String, Object> riskSummary = new LinkedHashMap<>();
+        riskSummary.put("total", riskWarnings.size());
+        riskSummary.put("high", riskWarnings.stream().filter(w -> w.riskLevel() == RiskLevel.HIGH).count());
+        riskSummary.put("medium", riskWarnings.stream().filter(w -> w.riskLevel() == RiskLevel.MEDIUM).count());
+        riskSummary.put("low", riskWarnings.stream().filter(w -> w.riskLevel() == RiskLevel.LOW).count());
+        riskSummary.put("undisposedHigh", riskWarnings.stream()
+                .filter(w -> w.riskLevel() == RiskLevel.HIGH && "UNDISPOSED".equals(w.disposalStatus())).count());
+        result.put("riskSummary", riskSummary);
 
         return result;
     }
@@ -300,6 +311,15 @@ public class AdminController {
     @GetMapping("/products/{id}/audit-records")
     public Object productAuditRecords(@PathVariable Long id) {
         return store.productAuditRecordsByProduct(id);
+    }
+
+    @GetMapping("/risk-warnings")
+    public List<ProductRiskWarning> riskWarnings(
+            @RequestParam(required = false) RiskLevel riskLevel,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String disposalStatus,
+            @RequestParam(required = false) Integer minMerchantComplaintCount) {
+        return store.productRiskWarnings(riskLevel, category, disposalStatus, minMerchantComplaintCount);
     }
 
     @GetMapping("/users")

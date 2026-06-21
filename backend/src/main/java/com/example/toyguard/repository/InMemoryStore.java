@@ -1,6 +1,7 @@
 package com.example.toyguard.repository;
 
 import com.example.toyguard.dto.ComplaintRequest;
+import com.example.toyguard.dto.ProductRiskWarning;
 import com.example.toyguard.model.*;
 import org.springframework.stereotype.Repository;
 
@@ -9,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Repository
 public class InMemoryStore {
@@ -49,6 +51,10 @@ public class InMemoryStore {
 
         complaints.put(900L, seededComplaint(900L, 104L, "彩泥创作套装", "user", "包装未标注适用年龄，存在误购风险。", ComplaintStatus.PROCESSING));
         complaints.put(901L, seededComplaint(901L, 102L, "儿童软弹发射器", "user", "疑似宣传射程与检测信息不一致。", ComplaintStatus.PENDING));
+        complaints.put(902L, seededComplaint(902L, 102L, "儿童软弹发射器", "user", "射程虚标，远超检测报告标注范围。", ComplaintStatus.PENDING));
+        complaints.put(903L, seededComplaint(903L, 102L, "儿童软弹发射器", "user", "软弹冲击力未做适用年龄分级提示。", ComplaintStatus.PROCESSING));
+        complaints.put(904L, seededComplaint(904L, 104L, "彩泥创作套装", "user", "塑化剂复检结果未在商品页公示。", ComplaintStatus.RESOLVED));
+        complaints.put(905L, seededComplaint(905L, 101L, "磁力积木 120 件套", "user", "磁力件脱落存在婴幼儿误吞风险。", ComplaintStatus.RESOLVED));
 
         complaintProcessRecords.put(7001L, new ComplaintProcessRecord(7001L, 900L, ComplaintStatus.PENDING, ComplaintStatus.PROCESSING,
                 InvestigationConclusion.UNDER_INVESTIGATION, "监管人员已介入核查", null, "regulator", LocalDateTime.now().minusDays(1)));
@@ -173,5 +179,109 @@ public class InMemoryStore {
                 .filter(r -> r.getComplaintId().equals(complaintId))
                 .sorted(Comparator.comparing(ComplaintProcessRecord::getOperateTime))
                 .toList();
+    }
+
+    public List<ProductRiskWarning> productRiskWarnings(RiskLevel riskLevel, String category, String disposalStatus, Integer minMerchantComplaintCount) {
+        Map<Long, List<Complaint>> complaintsByProduct = complaints.values().stream()
+                .collect(Collectors.groupingBy(Complaint::getProductId));
+
+        Map<Long, Integer> merchantComplaintCounts = new HashMap<>();
+        for (Complaint complaint : complaints.values()) {
+            ToyProduct product = products.get(complaint.getProductId());
+            if (product != null) {
+                merchantComplaintCounts.merge(product.getMerchantId(), 1, Integer::sum);
+            }
+        }
+
+        List<ProductRiskWarning> warnings = new ArrayList<>();
+        for (Map.Entry<Long, List<Complaint>> entry : complaintsByProduct.entrySet()) {
+            Long productId = entry.getKey();
+            ToyProduct product = products.get(productId);
+            if (product == null) {
+                continue;
+            }
+            List<Complaint> productComplaints = entry.getValue();
+            int complaintCount = productComplaints.size();
+            int unresolvedCount = (int) productComplaints.stream()
+                    .filter(c -> c.getStatus() == ComplaintStatus.PENDING || c.getStatus() == ComplaintStatus.PROCESSING)
+                    .count();
+            int resolvedCount = complaintCount - unresolvedCount;
+            String concentration = concentrationOf(complaintCount);
+            RiskLevel level = riskLevelOf(complaintCount, unresolvedCount, concentration);
+            String disposal = disposalOf(product.getStatus());
+            int merchantComplaintCount = merchantComplaintCounts.getOrDefault(product.getMerchantId(), 0);
+
+            if (riskLevel != null && level != riskLevel) {
+                continue;
+            }
+            if (category != null && !category.isBlank() && !category.equals(product.getCategory())) {
+                continue;
+            }
+            if (disposalStatus != null && !disposalStatus.isBlank() && !disposalStatus.equals(disposal)) {
+                continue;
+            }
+            if (minMerchantComplaintCount != null && merchantComplaintCount < minMerchantComplaintCount) {
+                continue;
+            }
+
+            warnings.add(new ProductRiskWarning(
+                    productId,
+                    product.getName(),
+                    product.getCategory(),
+                    product.getMerchantId(),
+                    product.getMerchantName(),
+                    product.getStatus(),
+                    complaintCount,
+                    unresolvedCount,
+                    resolvedCount,
+                    concentration,
+                    level,
+                    disposal,
+                    merchantComplaintCount
+            ));
+        }
+
+        Map<RiskLevel, Integer> riskOrder = Map.of(RiskLevel.HIGH, 0, RiskLevel.MEDIUM, 1, RiskLevel.LOW, 2);
+        warnings.sort(Comparator
+                .comparingInt((ProductRiskWarning w) -> riskOrder.get(w.riskLevel()))
+                .thenComparing(Comparator.comparingInt(ProductRiskWarning::merchantComplaintCount).reversed())
+                .thenComparing(Comparator.comparingInt(ProductRiskWarning::complaintCount).reversed())
+                .thenComparing(Comparator.comparingInt(ProductRiskWarning::unresolvedCount).reversed()));
+        return warnings;
+    }
+
+    private String concentrationOf(int complaintCount) {
+        if (complaintCount >= 3) {
+            return "高度集中";
+        }
+        if (complaintCount == 2) {
+            return "中度集中";
+        }
+        return "一般";
+    }
+
+    private RiskLevel riskLevelOf(int complaintCount, int unresolvedCount, String concentration) {
+        int score = complaintCount + unresolvedCount * 2;
+        if ("高度集中".equals(concentration)) {
+            score += 3;
+        } else if ("中度集中".equals(concentration)) {
+            score += 1;
+        }
+        if (score >= 7) {
+            return RiskLevel.HIGH;
+        }
+        if (score >= 3) {
+            return RiskLevel.MEDIUM;
+        }
+        return RiskLevel.LOW;
+    }
+
+    private String disposalOf(AuditStatus status) {
+        return switch (status) {
+            case RECTIFYING -> "RECTIFYING";
+            case OFF_SHELF -> "OFF_SHELF";
+            case REJECTED -> "REJECTED";
+            default -> "UNDISPOSED";
+        };
     }
 }

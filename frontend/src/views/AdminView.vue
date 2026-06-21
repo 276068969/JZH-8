@@ -60,6 +60,32 @@
       </div>
     </section>
 
+    <section class="dashboard-section">
+      <h2 class="section-title">投诉风险预警概览</h2>
+      <div class="metric-grid">
+        <div class="metric danger">
+          <span>高风险商品</span>
+          <strong>{{ riskSummary.high ?? 0 }}</strong>
+        </div>
+        <div class="metric warning">
+          <span>中风险商品</span>
+          <strong>{{ riskSummary.medium ?? 0 }}</strong>
+        </div>
+        <div class="metric">
+          <span>低风险商品</span>
+          <strong>{{ riskSummary.low ?? 0 }}</strong>
+        </div>
+        <div class="metric primary">
+          <span>预警商品总数</span>
+          <strong>{{ riskSummary.total ?? 0 }}</strong>
+        </div>
+        <div class="metric danger">
+          <span>未处置高风险</span>
+          <strong>{{ riskSummary.undisposedHigh ?? 0 }}</strong>
+        </div>
+      </div>
+    </section>
+
     <el-tabs v-model="active">
       <el-tab-pane label="商品审核" name="products">
         <div class="batch-toolbar">
@@ -163,6 +189,109 @@
             <template #default="{ row }">
               <el-button size="small" @click="openComplaintDetail(row.id)">详情</el-button>
               <el-button size="small" type="primary" @click="openComplaintProcess(row)">处理</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
+      <el-tab-pane label="投诉风险预警" name="risk-warnings">
+        <el-alert
+          v-if="(riskSummary.undisposedHigh ?? 0) > 0"
+          type="error"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #title>发现 {{ riskSummary.undisposedHigh }} 个未处置的高风险商品，建议优先核查处置</template>
+        </el-alert>
+        <div class="filter-bar">
+          <el-select
+            v-model="riskLevelFilter"
+            placeholder="风险等级"
+            clearable
+            style="width: 160px"
+            @change="searchRiskWarnings"
+            @clear="searchRiskWarnings"
+          >
+            <el-option label="高风险" value="HIGH" />
+            <el-option label="中风险" value="MEDIUM" />
+            <el-option label="低风险" value="LOW" />
+          </el-select>
+          <el-select
+            v-model="riskCategoryFilter"
+            placeholder="商品分类"
+            clearable
+            style="width: 180px"
+            @change="searchRiskWarnings"
+            @clear="searchRiskWarnings"
+          >
+            <el-option v-for="c in riskCategories" :key="c" :label="c" :value="c" />
+          </el-select>
+          <el-select
+            v-model="riskDisposalFilter"
+            placeholder="处置状态"
+            clearable
+            style="width: 160px"
+            @change="searchRiskWarnings"
+            @clear="searchRiskWarnings"
+          >
+            <el-option label="未处置" value="UNDISPOSED" />
+            <el-option label="整改中" value="RECTIFYING" />
+            <el-option label="已下架" value="OFF_SHELF" />
+            <el-option label="已驳回" value="REJECTED" />
+          </el-select>
+          <el-input-number
+            v-model="riskMerchantComplaintFilter"
+            placeholder="商家投诉≥"
+            :min="1"
+            :max="999"
+            clearable
+            style="width: 160px"
+            @change="searchRiskWarnings"
+          />
+          <el-button type="primary" @click="searchRiskWarnings">查询</el-button>
+          <el-button @click="resetRiskSearch">重置</el-button>
+        </div>
+        <el-table :data="riskWarnings" border>
+          <el-table-column prop="productName" label="商品" min-width="170" />
+          <el-table-column prop="category" label="分类" width="110" />
+          <el-table-column prop="merchantName" label="所属商家" min-width="150" />
+          <el-table-column label="商家被投诉" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.merchantComplaintCount >= 3 ? 'danger' : row.merchantComplaintCount >= 2 ? 'warning' : 'info'" size="small">
+                {{ row.merchantComplaintCount }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="关联投诉" width="100" align="center">
+            <template #default="{ row }"><strong>{{ row.complaintCount }}</strong></template>
+          </el-table-column>
+          <el-table-column label="未办结" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.unresolvedCount > 0 ? 'danger' : 'info'" size="small">{{ row.unresolvedCount }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="已办结" width="90" align="center">
+            <template #default="{ row }">{{ row.resolvedCount }}</template>
+          </el-table-column>
+          <el-table-column label="集中程度" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="concentrationType(row.concentration)" size="small">{{ row.concentration }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="风险等级" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="riskLevelType(row.riskLevel)">{{ riskLevelText(row.riskLevel) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="处置状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="disposalType(row.disposalStatus)" size="small">{{ disposalText(row.disposalStatus) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="110" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" @click="openRiskDetail(row)">核查</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -356,6 +485,109 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="riskDetailVisible" title="风险核查详情" width="760px">
+      <div v-if="riskDetail" class="complaint-detail">
+        <section class="detail-section risk-overview" :class="riskLevelClass(riskDetail.riskLevel)">
+          <div class="risk-overview-head">
+            <span class="risk-overview-name">{{ riskDetail.productName }}</span>
+            <el-tag :type="riskLevelType(riskDetail.riskLevel)" size="large">{{ riskLevelText(riskDetail.riskLevel) }}</el-tag>
+          </div>
+          <div class="risk-factor-grid">
+            <div class="risk-factor">
+              <span class="detail-label">商家被投诉次数</span>
+              <strong :class="riskDetail.merchantComplaintCount >= 3 ? 'danger-text' : ''">{{ riskDetail.merchantComplaintCount }}</strong>
+            </div>
+            <div class="risk-factor">
+              <span class="detail-label">关联投诉数</span>
+              <strong>{{ riskDetail.complaintCount }}</strong>
+            </div>
+            <div class="risk-factor">
+              <span class="detail-label">未办结数量</span>
+              <strong class="danger-text">{{ riskDetail.unresolvedCount }}</strong>
+            </div>
+            <div class="risk-factor">
+              <span class="detail-label">已办结数量</span>
+              <strong>{{ riskDetail.resolvedCount }}</strong>
+            </div>
+            <div class="risk-factor">
+              <span class="detail-label">投诉集中程度</span>
+              <el-tag :type="concentrationType(riskDetail.concentration)" size="small">{{ riskDetail.concentration }}</el-tag>
+            </div>
+            <div class="risk-factor">
+              <span class="detail-label">处置状态</span>
+              <el-tag :type="disposalType(riskDetail.disposalStatus)" size="small">{{ disposalText(riskDetail.disposalStatus) }}</el-tag>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h3 class="detail-title">商品信息</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">商品名称</span>
+              <span class="detail-value">{{ riskDetail.productName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">商品分类</span>
+              <span class="detail-value">{{ riskDetail.category }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">商品状态</span>
+              <el-tag :type="statusType(riskDetail.productStatus)" size="small">{{ statusText(riskDetail.productStatus) }}</el-tag>
+            </div>
+            <div class="detail-item" v-if="riskMerchant">
+              <span class="detail-label">所属商家</span>
+              <span class="detail-value">{{ riskMerchant.name }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section" v-if="riskMerchant">
+          <h3 class="detail-title">所属商家</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">商家名称</span>
+              <span class="detail-value">{{ riskMerchant.name }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">资质编号</span>
+              <span class="detail-value">{{ riskMerchant.licenseNo || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">联系方式</span>
+              <span class="detail-value">{{ riskMerchant.contact || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">资质状态</span>
+              <el-tag :type="statusType(riskMerchant.status)" size="small">{{ statusText(riskMerchant.status) }}</el-tag>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">黑名单</span>
+              <el-tag :type="riskMerchant.blacklisted ? 'danger' : 'success'" size="small">{{ riskMerchant.blacklisted ? '是' : '否' }}</el-tag>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h3 class="detail-title">关联投诉（{{ riskComplaints.length }} 条）</h3>
+          <el-table v-if="riskComplaints.length > 0" :data="riskComplaints" border size="small">
+            <el-table-column prop="id" label="编号" width="80" />
+            <el-table-column prop="reporter" label="投诉人" width="100" />
+            <el-table-column prop="reason" label="投诉原因" min-width="220" show-overflow-tooltip />
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="complaintType(row.status)" size="small">{{ complaintText(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="暂无关联投诉" :image-size="60" />
+        </section>
+      </div>
+      <template #footer>
+        <el-button @click="riskDetailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="batchAuditVisible" :title="batchAuditTitle" width="600px" @close="closeBatchAudit">
       <div v-if="batchAuditForm" class="batch-audit-content">
         <div class="batch-audit-summary">
@@ -445,6 +677,14 @@ const searchProductName = ref('')
 const searchMerchantId = ref<number | null>(null)
 const searchToStatus = ref('')
 
+const riskWarnings = ref<any[]>([])
+const riskLevelFilter = ref('')
+const riskCategoryFilter = ref('')
+const riskDisposalFilter = ref('')
+const riskMerchantComplaintFilter = ref<number | null>(null)
+const riskDetailVisible = ref(false)
+const riskDetail = ref<any>(null)
+
 const complaintDetailVisible = ref(false)
 const complaintDetail = ref<any>(null)
 const complaintProcessVisible = ref(false)
@@ -514,6 +754,24 @@ const complaintStatusMetrics = computed(() => {
   }))
 })
 
+const riskSummary = computed(() => dashboard.value.riskSummary || {})
+
+const riskCategories = computed(() => {
+  const set = new Set<string>()
+  riskWarnings.value.forEach(w => set.add(w.category))
+  return Array.from(set)
+})
+
+const riskMerchant = computed(() => {
+  if (!riskDetail.value) return null
+  return merchants.value.find(m => m.id === riskDetail.value.merchantId) || null
+})
+
+const riskComplaints = computed(() => {
+  if (!riskDetail.value) return []
+  return complaints.value.filter(c => c.productId === riskDetail.value.productId)
+})
+
 const auditableProductCount = computed(() =>
   selectedProducts.value.filter(p => AUDITABLE_STATUSES.includes(p.status)).length
 )
@@ -562,6 +820,34 @@ async function loadAll() {
   complaints.value = complaintRes.data
   users.value = userRes.data
   auditRecords.value = auditRes.data
+  await loadRiskWarnings()
+}
+
+async function loadRiskWarnings() {
+  const params: Record<string, any> = {}
+  if (riskLevelFilter.value) params.riskLevel = riskLevelFilter.value
+  if (riskCategoryFilter.value) params.category = riskCategoryFilter.value
+  if (riskDisposalFilter.value) params.disposalStatus = riskDisposalFilter.value
+  if (riskMerchantComplaintFilter.value !== null) params.minMerchantComplaintCount = riskMerchantComplaintFilter.value
+  const res = await http.get('/admin/risk-warnings', { params })
+  riskWarnings.value = res.data
+}
+
+function searchRiskWarnings() {
+  loadRiskWarnings()
+}
+
+function resetRiskSearch() {
+  riskLevelFilter.value = ''
+  riskCategoryFilter.value = ''
+  riskDisposalFilter.value = ''
+  riskMerchantComplaintFilter.value = null
+  loadRiskWarnings()
+}
+
+function openRiskDetail(row: any) {
+  riskDetail.value = row
+  riskDetailVisible.value = true
 }
 
 async function loadAuditRecords() {
@@ -789,6 +1075,30 @@ function conclusionType(conclusion: string) {
     NEEDS_RECTIFICATION: 'warning',
     PRODUCT_OFF_SHELF: 'danger'
   }[conclusion] || 'info'
+}
+
+function riskLevelText(level: string) {
+  return { HIGH: '高风险', MEDIUM: '中风险', LOW: '低风险' }[level] || level
+}
+
+function riskLevelType(level: string) {
+  return { HIGH: 'danger', MEDIUM: 'warning', LOW: 'info' }[level] || 'info'
+}
+
+function riskLevelClass(level: string) {
+  return { HIGH: 'risk-high', MEDIUM: 'risk-medium', LOW: 'risk-low' }[level] || ''
+}
+
+function disposalText(disposal: string) {
+  return { UNDISPOSED: '未处置', RECTIFYING: '整改中', OFF_SHELF: '已下架', REJECTED: '已驳回' }[disposal] || disposal
+}
+
+function disposalType(disposal: string) {
+  return { UNDISPOSED: 'danger', RECTIFYING: 'warning', OFF_SHELF: 'info', REJECTED: 'info' }[disposal] || 'info'
+}
+
+function concentrationType(concentration: string) {
+  return { '高度集中': 'danger', '中度集中': 'warning', '一般': 'info' }[concentration] || 'info'
 }
 
 onMounted(loadAll)
@@ -1140,5 +1450,59 @@ onMounted(loadAll)
 
 .skipped-reason {
   color: #909399;
+}
+
+.risk-overview {
+  border-left: 4px solid #909399;
+}
+
+.risk-overview.risk-high {
+  border-left-color: #f56c6c;
+  background: #fef0f0;
+}
+
+.risk-overview.risk-medium {
+  border-left-color: #e6a23c;
+  background: #fdf6ec;
+}
+
+.risk-overview.risk-low {
+  border-left-color: #909399;
+  background: #fafbfc;
+}
+
+.risk-overview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.risk-overview-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.risk-factor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.risk-factor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-factor strong {
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.risk-factor .danger-text {
+  color: #f56c6c;
 }
 </style>
