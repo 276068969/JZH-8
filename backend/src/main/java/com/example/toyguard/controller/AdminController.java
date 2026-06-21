@@ -113,7 +113,7 @@ public class AdminController {
         return product;
     }
 
-    private static final Set<AuditStatus> PRODUCT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING, AuditStatus.DRAFT);
+    private static final Set<AuditStatus> PRODUCT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING);
 
     @PostMapping("/products/batch-audit")
     public BatchAuditResult batchAuditProducts(@RequestBody BatchAuditRequest request, HttpServletRequest httpRequest) {
@@ -181,7 +181,7 @@ public class AdminController {
         return merchant;
     }
 
-    private static final Set<AuditStatus> MERCHANT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING, AuditStatus.DRAFT);
+    private static final Set<AuditStatus> MERCHANT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING);
 
     @PostMapping("/merchants/batch-audit")
     public BatchAuditResult batchAuditMerchants(@RequestBody BatchAuditRequest request) {

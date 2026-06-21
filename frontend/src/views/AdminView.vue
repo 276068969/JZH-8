@@ -93,9 +93,9 @@
           </el-table-column>
           <el-table-column label="操作" width="260" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="success" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'APPROVED', '审核通过')">通过</el-button>
-              <el-button size="small" type="warning" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'RECTIFYING', '需补充报告或警示标签')">整改</el-button>
-              <el-button size="small" type="danger" :disabled="!isProductAuditable(row)" @click="auditProduct(row.id, 'OFF_SHELF', '违规下架')">下架</el-button>
+              <el-button size="small" type="success" @click="auditProduct(row.id, 'APPROVED', '审核通过')">通过</el-button>
+              <el-button size="small" type="warning" @click="auditProduct(row.id, 'RECTIFYING', '需补充报告或警示标签')">整改</el-button>
+              <el-button size="small" type="danger" @click="auditProduct(row.id, 'OFF_SHELF', '违规下架')">下架</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -135,8 +135,8 @@
           </el-table-column>
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
-              <el-button size="small" type="success" :disabled="!isMerchantAuditable(row)" @click="auditMerchant(row.id, 'APPROVED', '资质通过')">通过</el-button>
-              <el-button size="small" type="warning" :disabled="!isMerchantAuditable(row)" @click="auditMerchant(row.id, 'RECTIFYING', '资质材料需补正')">整改</el-button>
+              <el-button size="small" type="success" @click="auditMerchant(row.id, 'APPROVED', '资质通过')">通过</el-button>
+              <el-button size="small" type="warning" @click="auditMerchant(row.id, 'RECTIFYING', '资质材料需补正')">整改</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -455,7 +455,7 @@ const merchantTableRef = ref()
 const selectedProducts = ref<any[]>([])
 const selectedMerchants = ref<any[]>([])
 
-const AUDITABLE_STATUSES = ['PENDING', 'RECTIFYING', 'DRAFT']
+const AUDITABLE_STATUSES = ['PENDING', 'RECTIFYING']
 
 const batchAuditVisible = ref(false)
 const batchAuditForm = ref<{
@@ -601,14 +601,6 @@ async function auditMerchant(id: number, status: string, remark: string) {
   await http.patch(`/admin/merchants/${id}/audit`, { status, remark })
   ElMessage.success('商家资质已更新')
   await loadAll()
-}
-
-function isProductAuditable(row: any) {
-  return AUDITABLE_STATUSES.includes(row.status)
-}
-
-function isMerchantAuditable(row: any) {
-  return AUDITABLE_STATUSES.includes(row.status)
 }
 
 function onProductSelectionChange(rows: any[]) {
