@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -134,11 +135,72 @@ public class AdminController {
         return store.complaints();
     }
 
-    @PatchMapping("/complaints/{id}")
-    public Complaint processComplaint(@PathVariable Long id, @Valid @RequestBody ComplaintProcessRequest request) {
+    @GetMapping("/complaints/{id}")
+    public Map<String, Object> complaintDetail(@PathVariable Long id) {
         Complaint complaint = store.complaint(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "投诉不存在"));
+        ToyProduct product = store.product(complaint.getProductId()).orElse(null);
+        List<ComplaintProcessRecord> processRecords = store.complaintProcessRecordsByComplaint(id);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("complaint", complaint);
+        result.put("product", product);
+        result.put("processRecords", processRecords);
+        return result;
+    }
+
+    @PatchMapping("/complaints/{id}")
+    public Complaint processComplaint(@PathVariable Long id, @Valid @RequestBody ComplaintProcessRequest request, HttpServletRequest httpRequest) {
+        Complaint complaint = store.complaint(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "投诉不存在"));
+        ComplaintStatus fromStatus = complaint.getStatus();
+        AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);
+        String operatorName = currentUser != null ? currentUser.displayName() : "系统";
+
         complaint.setStatus(request.status());
         complaint.getRecords().add(request.record());
+
+        if (request.conclusion() != null) {
+            complaint.setFinalConclusion(request.conclusion());
+        }
+
+        AuditStatus productActionResult = null;
+        if (request.productAction() != null) {
+            ToyProduct product = store.product(complaint.getProductId()).orElse(null);
+            if (product != null) {
+                AuditStatus productFromStatus = product.getStatus();
+                product.setStatus(request.productAction());
+                String remark = request.productRemark() != null ? request.productRemark() : "因投诉处置联动：" + request.record();
+                product.setAuditRemark(remark);
+                productActionResult = request.productAction();
+
+                ProductAuditRecord auditRecord = new ProductAuditRecord(
+                        null,
+                        product.getId(),
+                        product.getName(),
+                        product.getMerchantId(),
+                        product.getMerchantName(),
+                        productFromStatus,
+                        request.productAction(),
+                        remark,
+                        operatorName,
+                        LocalDateTime.now()
+                );
+                store.createProductAuditRecord(auditRecord);
+            }
+        }
+
+        ComplaintProcessRecord processRecord = new ComplaintProcessRecord(
+                null,
+                complaint.getId(),
+                fromStatus,
+                request.status(),
+                request.conclusion(),
+                request.record(),
+                productActionResult,
+                operatorName,
+                LocalDateTime.now()
+        );
+        store.createComplaintProcessRecord(processRecord);
+
         return complaint;
     }
 

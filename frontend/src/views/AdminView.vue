@@ -108,13 +108,19 @@
           <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }"><el-tag :type="complaintType(row.status)">{{ complaintText(row.status) }}</el-tag></template>
           </el-table-column>
+          <el-table-column label="核查结论" width="130">
+            <template #default="{ row }">
+              <el-tag v-if="row.finalConclusion" :type="conclusionType(row.finalConclusion)" size="small">{{ conclusionText(row.finalConclusion) }}</el-tag>
+              <span v-else style="color: #c0c4cc">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="处理记录" min-width="180">
             <template #default="{ row }">{{ row.records.join(' / ') }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="190">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="primary" @click="processComplaint(row.id, 'PROCESSING', '监管人员已介入核查')">受理</el-button>
-              <el-button size="small" type="success" @click="processComplaint(row.id, 'RESOLVED', '投诉已处理并反馈')">办结</el-button>
+              <el-button size="small" @click="openComplaintDetail(row.id)">详情</el-button>
+              <el-button size="small" type="primary" @click="openComplaintProcess(row)">处理</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -187,6 +193,126 @@
         </el-table>
       </el-tab-pane>
     </el-tabs>
+
+    <el-dialog v-model="complaintDetailVisible" title="投诉详情" width="720px">
+      <div v-if="complaintDetail" class="complaint-detail">
+        <section class="detail-section">
+          <h3 class="detail-title">投诉信息</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">投诉编号</span>
+              <span class="detail-value">#{{ complaintDetail.complaint.id }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">投诉状态</span>
+              <el-tag :type="complaintType(complaintDetail.complaint.status)">{{ complaintText(complaintDetail.complaint.status) }}</el-tag>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">投诉人</span>
+              <span class="detail-value">{{ complaintDetail.complaint.reporter }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">提交时间</span>
+              <span class="detail-value">{{ complaintDetail.complaint.createdAt }}</span>
+            </div>
+            <div class="detail-item full">
+              <span class="detail-label">投诉原因</span>
+              <span class="detail-value">{{ complaintDetail.complaint.reason }}</span>
+            </div>
+            <div class="detail-item" v-if="complaintDetail.complaint.finalConclusion">
+              <span class="detail-label">最终结论</span>
+              <el-tag :type="conclusionType(complaintDetail.complaint.finalConclusion)">{{ conclusionText(complaintDetail.complaint.finalConclusion) }}</el-tag>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section" v-if="complaintDetail.product">
+          <h3 class="detail-title">关联商品</h3>
+          <div class="product-info">
+            <img :src="complaintDetail.product.imageUrl" :alt="complaintDetail.product.name" class="product-thumb" />
+            <div class="product-meta">
+              <div class="product-name">{{ complaintDetail.product.name }}</div>
+              <div class="product-sub">分类：{{ complaintDetail.product.category }} · 商家：{{ complaintDetail.product.merchantName }}</div>
+              <div class="product-sub">认证编号：{{ complaintDetail.product.certificationNo || '—' }}</div>
+              <div class="product-status-row">
+                <span class="detail-label">当前状态：</span>
+                <el-tag :type="statusType(complaintDetail.product.status)">{{ statusText(complaintDetail.product.status) }}</el-tag>
+              </div>
+              <div class="product-sub" v-if="complaintDetail.product.auditRemark">审核备注：{{ complaintDetail.product.auditRemark }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h3 class="detail-title">处理记录</h3>
+          <el-timeline v-if="complaintDetail.processRecords && complaintDetail.processRecords.length > 0">
+            <el-timeline-item
+              v-for="(rec, idx) in complaintDetail.processRecords"
+              :key="rec.id || idx"
+              :timestamp="rec.operateTime"
+            >
+              <div class="process-record">
+                <div class="process-header">
+                  <span class="process-operator">{{ rec.operator }}</span>
+                  <el-tag size="small" :type="complaintType(rec.toStatus)">{{ complaintText(rec.toStatus) }}</el-tag>
+                  <el-tag v-if="rec.conclusion" size="small" :type="conclusionType(rec.conclusion)" style="margin-left: 6px">
+                    {{ conclusionText(rec.conclusion) }}
+                  </el-tag>
+                  <el-tag v-if="rec.productAction" type="warning" size="small" style="margin-left: 6px">
+                    商品→{{ statusText(rec.productAction) }}
+                  </el-tag>
+                </div>
+                <div class="process-remark">{{ rec.remark }}</div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+          <el-empty v-else description="暂无处理记录" :image-size="80" />
+        </section>
+      </div>
+      <template #footer>
+        <el-button @click="complaintDetailVisible = false">关闭</el-button>
+        <el-button v-if="complaintDetail" type="primary" @click="complaintDetailVisible = false; openComplaintProcessById(complaintDetail.complaint)">继续处理</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="complaintProcessVisible" title="处理投诉" width="560px">
+      <el-form v-if="processForm" label-position="top">
+        <el-form-item label="投诉商品">
+          <el-input :model-value="processForm.productName" disabled />
+        </el-form-item>
+        <el-form-item label="投诉状态">
+          <el-select v-model="processForm.status" style="width: 100%">
+            <el-option label="待处理" value="PENDING" />
+            <el-option label="处理中" value="PROCESSING" />
+            <el-option label="已办结" value="RESOLVED" />
+            <el-option label="已驳回" value="REJECTED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="核查结论">
+          <el-select v-model="processForm.conclusion" placeholder="请选择核查结论（可选）" clearable style="width: 100%">
+            <el-option label="核查中" value="UNDER_INVESTIGATION" />
+            <el-option label="投诉属实" value="VERIFIED" />
+            <el-option label="投诉不属实" value="UNFOUNDED" />
+            <el-option label="需商品整改" value="NEEDS_RECTIFICATION" />
+            <el-option label="需商品下架" value="PRODUCT_OFF_SHELF" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="联动商品处置">
+          <el-select v-model="processForm.productAction" placeholder="选择是否联动变更商品状态" clearable style="width: 100%">
+            <el-option label="标记商品整改" value="RECTIFYING" />
+            <el-option label="商品违规下架" value="OFF_SHELF" />
+          </el-select>
+          <div class="form-tip">选择后将自动同步更新商品状态并生成审核记录</div>
+        </el-form-item>
+        <el-form-item label="处置意见" required>
+          <el-input v-model="processForm.record" type="textarea" :rows="3" placeholder="请输入本次处置说明" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="complaintProcessVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitComplaintProcess">提交处理</el-button>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
@@ -207,6 +333,11 @@ const auditRecords = ref<any[]>([])
 const searchProductName = ref('')
 const searchMerchantId = ref<number | null>(null)
 const searchToStatus = ref('')
+
+const complaintDetailVisible = ref(false)
+const complaintDetail = ref<any>(null)
+const complaintProcessVisible = ref(false)
+const processForm = ref<any>(null)
 
 const metrics = computed(() => [
   { label: '商品总数', value: dashboard.value.products ?? 0 },
@@ -316,6 +447,50 @@ async function processComplaint(id: number, status: string, record: string) {
   await loadAll()
 }
 
+async function openComplaintDetail(id: number) {
+  const res = await http.get(`/admin/complaints/${id}`)
+  complaintDetail.value = res.data
+  complaintDetailVisible.value = true
+}
+
+function openComplaintProcess(row: any) {
+  openComplaintProcessById(row)
+}
+
+function openComplaintProcessById(complaint: any) {
+  processForm.value = {
+    complaintId: complaint.id,
+    productName: complaint.productName,
+    status: complaint.status === 'PENDING' ? 'PROCESSING' : complaint.status,
+    conclusion: '',
+    productAction: '',
+    record: ''
+  }
+  complaintProcessVisible.value = true
+}
+
+async function submitComplaintProcess() {
+  if (!processForm.value.record || !processForm.value.record.trim()) {
+    ElMessage.warning('请输入处置意见')
+    return
+  }
+  const payload: Record<string, any> = {
+    status: processForm.value.status,
+    record: processForm.value.record
+  }
+  if (processForm.value.conclusion) {
+    payload.conclusion = processForm.value.conclusion
+  }
+  if (processForm.value.productAction) {
+    payload.productAction = processForm.value.productAction
+  }
+  await http.patch(`/admin/complaints/${processForm.value.complaintId}`, payload)
+  ElMessage.success('投诉处理已提交')
+  complaintProcessVisible.value = false
+  processForm.value = null
+  await loadAll()
+}
+
 function statusText(status: string) {
   return { DRAFT: '草稿', PENDING: '待审核', APPROVED: '已通过', REJECTED: '已驳回', RECTIFYING: '整改中', OFF_SHELF: '已下架' }[status] || status
 }
@@ -330,6 +505,26 @@ function complaintText(status: string) {
 
 function complaintType(status: string) {
   return { PENDING: 'info', PROCESSING: 'warning', RESOLVED: 'success', REJECTED: 'danger' }[status] || 'info'
+}
+
+function conclusionText(conclusion: string) {
+  return {
+    UNDER_INVESTIGATION: '核查中',
+    VERIFIED: '投诉属实',
+    UNFOUNDED: '投诉不属实',
+    NEEDS_RECTIFICATION: '需商品整改',
+    PRODUCT_OFF_SHELF: '需商品下架'
+  }[conclusion] || conclusion
+}
+
+function conclusionType(conclusion: string) {
+  return {
+    UNDER_INVESTIGATION: 'info',
+    VERIFIED: 'danger',
+    UNFOUNDED: 'success',
+    NEEDS_RECTIFICATION: 'warning',
+    PRODUCT_OFF_SHELF: 'danger'
+  }[conclusion] || 'info'
 }
 
 onMounted(loadAll)
@@ -446,5 +641,123 @@ onMounted(loadAll)
 
 .status-metric.info::before {
   background: #909399;
+}
+
+.complaint-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-section {
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.detail-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0 0 12px 0;
+  padding-left: 8px;
+  border-left: 3px solid #409eff;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item.full {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #303133;
+}
+
+.product-info {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.product-thumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  flex-shrink: 0;
+}
+
+.product-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.product-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.product-sub {
+  font-size: 13px;
+  color: #606266;
+}
+
+.product-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-record {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.process-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.process-operator {
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+
+.process-remark {
+  font-size: 13px;
+  color: #606266;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>

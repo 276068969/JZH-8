@@ -18,9 +18,11 @@ public class InMemoryStore {
     private final Map<Long, Complaint> complaints = new LinkedHashMap<>();
     private final Map<Long, Notice> notices = new LinkedHashMap<>();
     private final Map<Long, ProductAuditRecord> productAuditRecords = new LinkedHashMap<>();
+    private final Map<Long, ComplaintProcessRecord> complaintProcessRecords = new LinkedHashMap<>();
     private final AtomicLong complaintSeq = new AtomicLong(1000);
     private final AtomicLong productSeq = new AtomicLong(200);
     private final AtomicLong productAuditSeq = new AtomicLong(5000);
+    private final AtomicLong complaintProcessSeq = new AtomicLong(7000);
 
     public InMemoryStore() {
         users.put("admin", new AppUser(1L, "admin", "123456", "系统管理员", Role.ADMIN));
@@ -47,6 +49,9 @@ public class InMemoryStore {
 
         complaints.put(900L, seededComplaint(900L, 104L, "彩泥创作套装", "user", "包装未标注适用年龄，存在误购风险。", ComplaintStatus.PROCESSING));
         complaints.put(901L, seededComplaint(901L, 102L, "儿童软弹发射器", "user", "疑似宣传射程与检测信息不一致。", ComplaintStatus.PENDING));
+
+        complaintProcessRecords.put(7001L, new ComplaintProcessRecord(7001L, 900L, ComplaintStatus.PENDING, ComplaintStatus.PROCESSING,
+                InvestigationConclusion.UNDER_INVESTIGATION, "监管人员已介入核查", null, "regulator", LocalDateTime.now().minusDays(1)));
 
         notices.put(1L, new Notice(1L, "六一儿童节玩具安全专项检查启动", "重点检查磁力玩具、软弹玩具、彩泥类产品的认证与警示标签。", LocalDate.now().minusDays(12)));
         notices.put(2L, new Notice(2L, "平台上线商品检测报告抽验规则", "已上架商品将按类目与投诉热度进行抽样复核。", LocalDate.now().minusDays(5)));
@@ -153,6 +158,20 @@ public class InMemoryStore {
         return productAuditRecords.values().stream()
                 .filter(r -> r.getProductId().equals(productId))
                 .sorted(Comparator.comparing(ProductAuditRecord::getOperateTime).reversed())
+                .toList();
+    }
+
+    public ComplaintProcessRecord createComplaintProcessRecord(ComplaintProcessRecord record) {
+        Long id = complaintProcessSeq.incrementAndGet();
+        record.setId(id);
+        complaintProcessRecords.put(id, record);
+        return record;
+    }
+
+    public List<ComplaintProcessRecord> complaintProcessRecordsByComplaint(Long complaintId) {
+        return complaintProcessRecords.values().stream()
+                .filter(r -> r.getComplaintId().equals(complaintId))
+                .sorted(Comparator.comparing(ComplaintProcessRecord::getOperateTime))
                 .toList();
     }
 }

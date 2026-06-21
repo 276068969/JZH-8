@@ -12,6 +12,7 @@ public class Complaint {
     private String reason;
     private ComplaintStatus status;
     private LocalDateTime createdAt;
+    private InvestigationConclusion finalConclusion;
     private List<String> records = new ArrayList<>();
 
     public Complaint(Long id, Long productId, String productName, String reporter, String reason, ComplaintStatus status, LocalDateTime createdAt) {
@@ -31,6 +32,8 @@ public class Complaint {
     public String getReason() { return reason; }
     public ComplaintStatus getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public InvestigationConclusion getFinalConclusion() { return finalConclusion; }
     public List<String> getRecords() { return records; }
     public void setStatus(ComplaintStatus status) { this.status = status; }
+    public void setFinalConclusion(InvestigationConclusion finalConclusion) { this.finalConclusion = finalConclusion; }
 }
