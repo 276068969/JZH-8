@@ -24,6 +24,8 @@ logs/
 *.err
 *.pid
 *.pid.lock
+.tmp-login-dom.html
+.tmp-solo-chrome-*/
 tmp/
 temp/
 .cache/
