@@ -58,17 +58,17 @@ public class InMemoryStore {
         complaints.put(904L, seededComplaint(904L, 104L, "彩泥创作套装", "user", "塑化剂复检结果未在商品页公示。", ComplaintStatus.RESOLVED));
         complaints.put(905L, seededComplaint(905L, 101L, "磁力积木 120 件套", "user", "磁力件脱落存在婴幼儿误吞风险。", ComplaintStatus.RESOLVED));
 
-        complaintProcessRecords.put(7001L, new ComplaintProcessRecord(7001L, 900L, ComplaintStatus.PENDING, ComplaintStatus.PROCESSING,
+        createComplaintProcessRecord(new ComplaintProcessRecord(null, 900L, ComplaintStatus.PENDING, ComplaintStatus.PROCESSING,
                 InvestigationConclusion.UNDER_INVESTIGATION, "监管人员已介入核查", null, "regulator", LocalDateTime.now().minusDays(1)));
 
         notices.put(1L, new Notice(1L, "六一儿童节玩具安全专项检查启动", "重点检查磁力玩具、软弹玩具、彩泥类产品的认证与警示标签。", LocalDate.now().minusDays(12)));
         notices.put(2L, new Notice(2L, "平台上线商品检测报告抽验规则", "已上架商品将按类目与投诉热度进行抽样复核。", LocalDate.now().minusDays(5)));
 
-        productAuditRecords.put(5001L, new ProductAuditRecord(5001L, 101L, "磁力积木 120 件套", 1L, "星河玩具旗舰店",
+        createProductAuditRecord(new ProductAuditRecord(null, 101L, "磁力积木 120 件套", 1L, "星河玩具旗舰店",
                 AuditStatus.PENDING, AuditStatus.APPROVED, "资质齐全，检测报告有效", "admin", LocalDateTime.now().minusDays(10)));
-        productAuditRecords.put(5002L, new ProductAuditRecord(5002L, 103L, "毛绒安抚熊", 1L, "星河玩具旗舰店",
+        createProductAuditRecord(new ProductAuditRecord(null, 103L, "毛绒安抚熊", 1L, "星河玩具旗舰店",
                 AuditStatus.PENDING, AuditStatus.APPROVED, "通过", "regulator", LocalDateTime.now().minusDays(7)));
-        productAuditRecords.put(5003L, new ProductAuditRecord(5003L, 104L, "彩泥创作套装", 3L, "彩盒玩具铺",
+        createProductAuditRecord(new ProductAuditRecord(null, 104L, "彩泥创作套装", 3L, "彩盒玩具铺",
                 AuditStatus.PENDING, AuditStatus.RECTIFYING, "缺少年龄分级标识", "regulator", LocalDateTime.now().minusDays(3)));
     }
 
