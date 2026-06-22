@@ -26,6 +26,9 @@ public class AuthController {
         AppUser user = store.findUser(request.username())
                 .filter(found -> found.password().equals(request.password()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误"));
+        if (!user.enabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用，请联系管理员");
+        }
         return new LoginResponse(tokenService.issue(user), user.username(), user.displayName(), user.role());
     }
 }

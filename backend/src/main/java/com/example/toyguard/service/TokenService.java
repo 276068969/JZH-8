@@ -39,6 +39,23 @@ public class TokenService {
         if (!sign(payload).equals(parts[1])) {
             return Optional.empty();
         }
+        return store.findUser(payload.split(":")[0])
+                .filter(AppUser::enabled);
+    }
+
+    public Optional<AppUser> verifyIgnoreDisabled(String header) {
+        if (header == null || !header.startsWith("Bearer ")) {
+            return Optional.empty();
+        }
+        String token = header.substring(7);
+        String[] parts = token.split("\\.");
+        if (parts.length != 2) {
+            return Optional.empty();
+        }
+        String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
+        if (!sign(payload).equals(parts[1])) {
+            return Optional.empty();
+        }
         return store.findUser(payload.split(":")[0]);
     }
 

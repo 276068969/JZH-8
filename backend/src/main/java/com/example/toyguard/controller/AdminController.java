@@ -1,6 +1,7 @@
 package com.example.toyguard.controller;
 
 import com.example.toyguard.config.AuthInterceptor;
+import com.example.toyguard.config.RolePermissionConfig;
 import com.example.toyguard.dto.BatchAuditRequest;
 import com.example.toyguard.dto.BatchAuditResult;
 import com.example.toyguard.dto.ComplaintProcessRequest;
@@ -27,6 +28,20 @@ public class AdminController {
 
     public AdminController(InMemoryStore store) {
         this.store = store;
+    }
+
+    private void checkSensitivePermission(HttpServletRequest httpRequest, String operation) {
+        AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未登录");
+        }
+        if (!currentUser.enabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "身份已失效，无权执行" + operation);
+        }
+        Set<Role> allowedRoles = RolePermissionConfig.getAllowedRoles("/admin/" + operation);
+        if (allowedRoles != null && !allowedRoles.contains(currentUser.role())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权限执行" + operation);
+        }
     }
 
     @GetMapping("/dashboard")
@@ -101,6 +116,7 @@ public class AdminController {
 
     @PatchMapping("/products/{id}/audit")
     public ToyProduct auditProduct(@PathVariable Long id, @RequestBody StatusRequest request, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "products/audit");
         ToyProduct product = store.product(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
         AuditStatus fromStatus = product.getStatus();
         AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);
@@ -128,6 +144,7 @@ public class AdminController {
 
     @PostMapping("/products/batch-audit")
     public BatchAuditResult batchAuditProducts(@RequestBody BatchAuditRequest request, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "products/batch-audit");
         BatchAuditResult result = new BatchAuditResult();
         if (request.ids() == null || request.ids().isEmpty()) {
             return result;
@@ -185,7 +202,8 @@ public class AdminController {
     }
 
     @PatchMapping("/merchants/{id}/audit")
-    public Merchant auditMerchant(@PathVariable Long id, @RequestBody StatusRequest request) {
+    public Merchant auditMerchant(@PathVariable Long id, @RequestBody StatusRequest request, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "merchants/audit");
         Merchant merchant = store.merchant(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商家不存在"));
         merchant.setStatus(request.status());
         merchant.setRemark(request.remark());
@@ -195,7 +213,8 @@ public class AdminController {
     private static final Set<AuditStatus> MERCHANT_AUDITABLE_STATUSES = Set.of(AuditStatus.PENDING, AuditStatus.RECTIFYING);
 
     @PostMapping("/merchants/batch-audit")
-    public BatchAuditResult batchAuditMerchants(@RequestBody BatchAuditRequest request) {
+    public BatchAuditResult batchAuditMerchants(@RequestBody BatchAuditRequest request, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "merchants/batch-audit");
         BatchAuditResult result = new BatchAuditResult();
         if (request.ids() == null || request.ids().isEmpty()) {
             return result;
@@ -220,7 +239,8 @@ public class AdminController {
     }
 
     @PatchMapping("/merchants/{id}/blacklist")
-    public Merchant blacklist(@PathVariable Long id, @RequestParam boolean enabled) {
+    public Merchant blacklist(@PathVariable Long id, @RequestParam boolean enabled, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "merchants/blacklist");
         Merchant merchant = store.merchant(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商家不存在"));
         merchant.setBlacklisted(enabled);
         return merchant;
@@ -246,6 +266,7 @@ public class AdminController {
 
     @PatchMapping("/complaints/{id}")
     public Complaint processComplaint(@PathVariable Long id, @Valid @RequestBody ComplaintProcessRequest request, HttpServletRequest httpRequest) {
+        checkSensitivePermission(httpRequest, "complaints/process");
         Complaint complaint = store.complaint(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "投诉不存在"));
         ComplaintStatus fromStatus = complaint.getStatus();
         AppUser currentUser = (AppUser) httpRequest.getAttribute(AuthInterceptor.CURRENT_USER);

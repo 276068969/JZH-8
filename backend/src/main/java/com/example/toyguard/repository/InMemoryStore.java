@@ -29,10 +29,11 @@ public class InMemoryStore {
     private final AtomicLong complaintProcessSeq = new AtomicLong(7000);
 
     public InMemoryStore() {
-        users.put("admin", new AppUser(1L, "admin", "123456", "系统管理员", Role.ADMIN));
-        users.put("regulator", new AppUser(2L, "regulator", "123456", "监管人员", Role.REGULATOR));
-        users.put("merchant", new AppUser(3L, "merchant", "123456", "星河玩具商家", Role.MERCHANT));
-        users.put("user", new AppUser(4L, "user", "123456", "普通用户", Role.USER));
+        users.put("admin", new AppUser(1L, "admin", "123456", "系统管理员", Role.ADMIN, true));
+        users.put("regulator", new AppUser(2L, "regulator", "123456", "监管人员", Role.REGULATOR, true));
+        users.put("merchant", new AppUser(3L, "merchant", "123456", "星河玩具商家", Role.MERCHANT, true));
+        users.put("user", new AppUser(4L, "user", "123456", "普通用户", Role.USER, true));
+        users.put("disabled_regulator", new AppUser(5L, "disabled_regulator", "123456", "已离职监管员", Role.REGULATOR, false));
 
         merchants.put(1L, new Merchant(1L, "星河玩具旗舰店", "LIC-TOY-2026-001", "merchant@example.com", AuditStatus.APPROVED, false, "资质齐全", "merchant"));
         merchants.put(2L, new Merchant(2L, "童趣优选", "LIC-TOY-2026-019", "kids@example.com", AuditStatus.PENDING, false, "待核验检测报告", null));
