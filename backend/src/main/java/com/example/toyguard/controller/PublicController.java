@@ -1,18 +1,19 @@
 package com.example.toyguard.controller;
 
 import com.example.toyguard.dto.ComplaintRequest;
-import com.example.toyguard.model.AuditStatus;
-import com.example.toyguard.model.Complaint;
-import com.example.toyguard.model.Merchant;
-import com.example.toyguard.model.ToyProduct;
+import com.example.toyguard.model.*;
 import com.example.toyguard.repository.InMemoryStore;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/public")
@@ -67,5 +68,19 @@ public class PublicController {
     @PostMapping("/complaints")
     public Complaint createComplaint(@Valid @RequestBody ComplaintRequest request) {
         return store.createComplaint(request);
+    }
+
+    @GetMapping("/complaints/query")
+    public Map<String, Object> queryComplaint(@RequestParam String code) {
+        Complaint complaint = store.findComplaintByQueryCode(code.toUpperCase())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到该投诉记录"));
+        ToyProduct product = store.product(complaint.getProductId()).orElse(null);
+        List<ComplaintProcessRecord> processRecords = store.complaintProcessRecordsByComplaint(complaint.getId());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("complaint", complaint);
+        result.put("product", product);
+        result.put("processRecords", processRecords);
+        return result;
     }
 }

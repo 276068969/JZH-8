@@ -18,10 +18,12 @@ public class InMemoryStore {
     private final Map<Long, Merchant> merchants = new LinkedHashMap<>();
     private final Map<Long, ToyProduct> products = new LinkedHashMap<>();
     private final Map<Long, Complaint> complaints = new LinkedHashMap<>();
+    private final Map<String, Complaint> complaintsByCode = new LinkedHashMap<>();
     private final Map<Long, Notice> notices = new LinkedHashMap<>();
     private final Map<Long, ProductAuditRecord> productAuditRecords = new LinkedHashMap<>();
     private final Map<Long, ComplaintProcessRecord> complaintProcessRecords = new LinkedHashMap<>();
     private final AtomicLong complaintSeq = new AtomicLong(1000);
+    private final Random random = new Random();
     private final AtomicLong productSeq = new AtomicLong(200);
     private final AtomicLong productAuditSeq = new AtomicLong(5000);
     private final AtomicLong complaintProcessSeq = new AtomicLong(7000);
@@ -70,9 +72,20 @@ public class InMemoryStore {
                 AuditStatus.PENDING, AuditStatus.RECTIFYING, "缺少年龄分级标识", "regulator", LocalDateTime.now().minusDays(3)));
     }
 
+    private String generateQueryCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        StringBuilder sb = new StringBuilder("CMP");
+        for (int i = 0; i < 6; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+
     private Complaint seededComplaint(Long id, Long productId, String productName, String reporter, String reason, ComplaintStatus status) {
-        Complaint complaint = new Complaint(id, productId, productName, reporter, reason, status, LocalDateTime.now().minusDays(2));
+        String code = "CMP" + id;
+        Complaint complaint = new Complaint(id, code, productId, productName, reporter, reason, status, LocalDateTime.now().minusDays(2));
         complaint.getRecords().add("系统受理投诉");
+        complaintsByCode.put(code, complaint);
         return complaint;
     }
 
@@ -93,11 +106,17 @@ public class InMemoryStore {
     public Complaint createComplaint(ComplaintRequest request) {
         ToyProduct product = products.get(request.productId());
         Long id = complaintSeq.incrementAndGet();
-        Complaint complaint = new Complaint(id, request.productId(), product == null ? "未知商品" : product.getName(),
+        String queryCode = generateQueryCode();
+        Complaint complaint = new Complaint(id, queryCode, request.productId(), product == null ? "未知商品" : product.getName(),
                 request.reporter(), request.reason(), ComplaintStatus.PENDING, LocalDateTime.now());
         complaint.getRecords().add("用户提交投诉");
         complaints.put(id, complaint);
+        complaintsByCode.put(queryCode, complaint);
         return complaint;
+    }
+
+    public Optional<Complaint> findComplaintByQueryCode(String queryCode) {
+        return Optional.ofNullable(complaintsByCode.get(queryCode));
     }
 
     public List<ToyProduct> productsByMerchant(Long merchantId) {

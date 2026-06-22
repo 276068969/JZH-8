@@ -6,6 +6,7 @@ import java.util.List;
 
 public class Complaint {
     private Long id;
+    private String queryCode;
     private Long productId;
     private String productName;
     private String reporter;
@@ -15,8 +16,9 @@ public class Complaint {
     private InvestigationConclusion finalConclusion;
     private List<String> records = new ArrayList<>();
 
-    public Complaint(Long id, Long productId, String productName, String reporter, String reason, ComplaintStatus status, LocalDateTime createdAt) {
+    public Complaint(Long id, String queryCode, Long productId, String productName, String reporter, String reason, ComplaintStatus status, LocalDateTime createdAt) {
         this.id = id;
+        this.queryCode = queryCode;
         this.productId = productId;
         this.productName = productName;
         this.reporter = reporter;
@@ -24,6 +26,8 @@ public class Complaint {
         this.status = status;
         this.createdAt = createdAt;
     }
+
+    public String getQueryCode() { return queryCode; }
 
     public Long getId() { return id; }
     public Long getProductId() { return productId; }

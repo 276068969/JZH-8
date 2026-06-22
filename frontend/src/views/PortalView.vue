@@ -6,7 +6,10 @@
         <h1>玩具售卖全链路监管</h1>
         <p>面向消费者查询、商家合规上架、监管审核与投诉处置的一体化平台。</p>
       </div>
-      <el-button type="primary" size="large" @click="goToBackend">{{ auth.token ? '进入后台' : '登录' }}</el-button>
+      <div class="hero-actions">
+        <el-button type="primary" size="large" @click="goToBackend">{{ auth.token ? '进入后台' : '登录' }}</el-button>
+        <el-button size="large" :icon="Search" @click="goToQuery">投诉进度查询</el-button>
+      </div>
     </section>
 
     <section class="filter-panel">
@@ -114,6 +117,23 @@
         <el-button type="primary" @click="submitComplaint">提交</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="successDialogVisible" title="投诉提交成功" width="480px" :close-on-click-modal="false">
+      <div class="success-content">
+        <el-result icon="success" title="投诉已提交" sub-title="请妥善保管您的投诉查询码，可随时查询处理进度">
+          <template #extra>
+            <div class="query-code-box">
+              <span class="code-label">您的投诉查询码</span>
+              <span class="code-value">{{ submittedComplaint?.queryCode }}</span>
+            </div>
+          </template>
+        </el-result>
+      </div>
+      <template #footer>
+        <el-button @click="successDialogVisible = false">我知道了</el-button>
+        <el-button type="primary" @click="goToQueryFromResult">立即查询进度</el-button>
+      </template>
+    </el-dialog>
   </main>
 </template>
 
@@ -165,7 +185,9 @@ const certificationNo = ref('')
 
 const categories = ['益智玩具', '运动玩具', '毛绒玩具', '手工玩具']
 const dialogVisible = ref(false)
+const successDialogVisible = ref(false)
 const complaint = reactive({ productId: 0, productName: '', reporter: 'user', reason: '' })
+const submittedComplaint = ref<any>(null)
 
 const activeFilters = computed<ActiveFilter[]>(() => {
   const list: ActiveFilter[] = []
@@ -239,9 +261,19 @@ function openComplaint(item: Product) {
 }
 
 async function submitComplaint() {
-  await http.post('/public/complaints', complaint)
-  ElMessage.success('投诉已提交，等待监管处理')
+  const { data } = await http.post('/public/complaints', complaint)
+  submittedComplaint.value = data
   dialogVisible.value = false
+  successDialogVisible.value = true
+}
+
+function goToQuery() {
+  router.push('/complaint/query')
+}
+
+function goToQueryFromResult() {
+  successDialogVisible.value = false
+  router.push({ path: '/complaint/query', query: { code: submittedComplaint.value?.queryCode } })
 }
 
 function goToBackend() {
@@ -267,6 +299,41 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.success-content {
+  padding: 10px 0;
+}
+
+.query-code-box {
+  background: #f0f9ff;
+  border: 1px dashed #67c23a;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.query-code-box .code-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.query-code-box .code-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #409eff;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+}
+
 .filter-panel {
   background: #fff;
   border: 1px solid #ebeef5;

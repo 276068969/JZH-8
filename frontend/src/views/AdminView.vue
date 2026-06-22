@@ -170,6 +170,13 @@
 
       <el-tab-pane label="投诉处理" name="complaints">
         <el-table :data="complaints" border>
+          <el-table-column prop="queryCode" label="查询码" width="130">
+            <template #default="{ row }">
+              <span style="font-family: 'Courier New', monospace; color: #409eff; font-weight: 600; font-size: 12px">
+                {{ row.queryCode }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column prop="productName" label="商品" min-width="160" />
           <el-table-column prop="reporter" label="投诉人" width="110" />
           <el-table-column prop="reason" label="投诉原因" min-width="240" />
@@ -373,6 +380,12 @@
             <div class="detail-item">
               <span class="detail-label">投诉编号</span>
               <span class="detail-value">#{{ complaintDetail.complaint.id }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">查询码</span>
+              <span class="detail-value" style="font-family: 'Courier New', monospace; color: #409eff; font-weight: 600">
+                {{ complaintDetail.complaint.queryCode }}
+              </span>
             </div>
             <div class="detail-item">
               <span class="detail-label">投诉状态</span>
