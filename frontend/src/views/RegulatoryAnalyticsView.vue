@@ -174,6 +174,35 @@ let complaintChart: echarts.ECharts | null = null
 let merchantRiskChart: echarts.ECharts | null = null
 let trendChart: echarts.ECharts | null = null
 
+function safeInitChart(dom: HTMLElement, instanceRef: echarts.ECharts | null): echarts.ECharts {
+  const exist = echarts.getInstanceByDom(dom)
+  if (exist) return exist
+  if (instanceRef) {
+    try { instanceRef.dispose() } catch (_) { /* noop */ }
+  }
+  return echarts.init(dom)
+}
+
+function disposeAllCharts() {
+  ;[productChart, complaintChart, merchantRiskChart, trendChart].forEach(chart => {
+    if (chart) {
+      try { chart.dispose() } catch (_) { /* noop */ }
+    }
+  })
+  productChart = null
+  complaintChart = null
+  merchantRiskChart = null
+  trendChart = null
+}
+
+function resizeAllCharts() {
+  ;[productChart, complaintChart, merchantRiskChart, trendChart].forEach(chart => {
+    if (chart) {
+      try { chart.resize() } catch (_) { /* noop */ }
+    }
+  })
+}
+
 const productChartType = ref('pie')
 const productChartOptions = [
   { label: '饼图', value: 'pie' },
@@ -458,9 +487,7 @@ function generateTrendData() {
 
 function renderProductChart() {
   if (!productChartRef.value) return
-  if (!productChart) {
-    productChart = echarts.init(productChartRef.value)
-  }
+  productChart = safeInitChart(productChartRef.value, productChart)
   const list = productStatusList.value
   let option: echarts.EChartsOption
 
@@ -501,9 +528,7 @@ function renderProductChart() {
 
 function renderComplaintChart() {
   if (!complaintChartRef.value) return
-  if (!complaintChart) {
-    complaintChart = echarts.init(complaintChartRef.value)
-  }
+  complaintChart = safeInitChart(complaintChartRef.value, complaintChart)
   const list = complaintStatusList.value
   let option: echarts.EChartsOption
 
