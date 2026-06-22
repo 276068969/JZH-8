@@ -69,7 +69,7 @@ class AdminBatchAuditTest {
         BatchAuditRequest request = new BatchAuditRequest(
                 List.of(2L, 3L, 1L), AuditStatus.APPROVED, "批量资质通过回归");
 
-        BatchAuditResult result = controller.batchAuditMerchants(request);
+        BatchAuditResult result = controller.batchAuditMerchants(request, mockRequest);
 
         assertEquals(3, result.getTotal());
         assertEquals(2, result.getSuccessCount());
