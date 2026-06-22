@@ -233,3 +233,11 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .topbar nav {
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+  }
+}

@@ -5,7 +5,12 @@
         <p class="eyebrow">Management Console</p>
         <h1>监管后台</h1>
       </div>
-      <el-tag size="large">{{ auth.role || '未登录' }}</el-tag>
+      <div class="admin-head-actions">
+        <router-link to="/analytics">
+          <el-button type="success" size="large" :icon="DataAnalysis">数据分析</el-button>
+        </router-link>
+        <el-tag size="large">{{ auth.role || '未登录' }}</el-tag>
+      </div>
     </section>
 
     <section class="dashboard-section">
@@ -675,6 +680,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { DataAnalysis } from '@element-plus/icons-vue'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 
@@ -1118,6 +1124,12 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+.admin-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .filter-bar {
   display: flex;
   gap: 12px;

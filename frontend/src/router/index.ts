@@ -6,6 +6,7 @@ import AdminView from '../views/AdminView.vue'
 import MerchantWorkbench from '../views/MerchantWorkbench.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ComplaintQueryView from '../views/ComplaintQueryView.vue'
+import RegulatoryAnalyticsView from '../views/RegulatoryAnalyticsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,6 +14,7 @@ const router = createRouter({
     { path: '/', component: PortalView },
     { path: '/product/:id', component: ProductDetailView },
     { path: '/complaint/query', component: ComplaintQueryView },
+    { path: '/analytics', component: RegulatoryAnalyticsView, meta: { requiresAuth: true, roles: ['ADMIN', 'REGULATOR'] } },
     { path: '/login', component: LoginView },
     { path: '/admin', component: AdminView, meta: { requiresAuth: true, roles: ['ADMIN', 'REGULATOR'] } },
     { path: '/merchant', component: MerchantWorkbench, meta: { requiresAuth: true, roles: ['MERCHANT'] } }

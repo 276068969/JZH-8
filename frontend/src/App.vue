@@ -8,6 +8,7 @@
       <nav>
         <router-link to="/">前台查询</router-link>
         <router-link to="/admin">监管后台</router-link>
+        <router-link v-if="auth.token && (auth.role === 'ADMIN' || auth.role === 'REGULATOR')" to="/analytics">数据分析</router-link>
         <router-link v-if="!auth.token" to="/login">登录</router-link>
         <button v-else class="link-button" @click="logout">{{ auth.displayName }} 退出</button>
       </nav>
